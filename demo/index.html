@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>restaurant-menu demo</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="../dist/restaurant-menu.css" />
+  <style>
+    body { margin: 0; padding: 24px; background: #f5f6f8; font-family: 'Segoe UI', sans-serif; }
+    #menuRoot { max-width: 1200px; margin: 0 auto; }
+    h1 { max-width: 1200px; margin: 0 auto 18px; color: #1f2937; }
+    .log {
+      max-width: 1200px; margin: 16px auto 0; padding: 10px 14px;
+      background: #111827; color: #d1fae5; border-radius: 8px; font-family: monospace;
+      font-size: 12px; min-height: 60px; max-height: 180px; overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="menuRoot"></div>
+  <pre class="log" id="log"></pre>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="../dist/restaurant-menu.js"></script>
+  <script>
+    function log(msg, obj) {
+      var line = "[" + new Date().toLocaleTimeString() + "] " + msg +
+                 (obj ? " " + JSON.stringify(obj) : "");
+      var $l = $("#log");
+      $l.text(line + "\n" + $l.text());
+    }
+
+    var PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='150'>" +
+      "<rect width='100%' height='100%' fill='#e0e0e0'/>" +
+      "<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='#1a1a1a' font-family='sans-serif'>Menu</text>" +
+      "</svg>"
+    );
+
+    var menu = RestaurantMenu.create({
+      containerId: 'menuRoot',
+      table: {
+        id: 'T1', name: 'Table 1', seats: 4, guests: 2, server: 'Alex',
+        orderNumber: 'A-1042',
+        orderedAt: new Date()
+      },
+
+      complexAnimations: true,
+
+      basketSections: [
+        { id: 'kitchen', label: 'Kitchen', icon: 'fa-solid fa-utensils' },
+        { id: 'bar',     label: 'Bar',     icon: 'fa-solid fa-martini-glass' }
+      ],
+      defaultBasketSection: 'kitchen',
+
+      categories: [
+        {
+          id: 'food', 
+          label: 'Food', 
+          icon: 'fa-solid fa-burger',
+          basketSection: 'kitchen',
+          subcategories: [
+            { id: 'appetizers', label: 'Appetizers' },
+            { id: 'mains',      label: 'Mains' },
+            { id: 'desserts',   label: 'Desserts' }
+          ]
+        },
+        {
+          id: 'drinks', label: 'Drinks', icon: 'fa-solid fa-wine-glass',
+          basketSection: 'bar',
+          subcategories: [
+            { id: 'soft', label: 'Soft',     basketSection: 'kitchen' },
+            { id: 'bar',  label: 'Bar' }
+          ]
+        }
+      ],
+
+      items: [
+        { id: 'i1', name: 'Bruschetta',       description: 'Toasted bread, tomato, basil', price: 7.50,  image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'appetizers' },
+        { id: 'i2', name: 'Caesar Salad',     description: 'Romaine, parmesan, anchovy',    price: 9.00,  image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'appetizers' },
+        { id: 'i3', name: 'Ribeye Steak',     description: '250g aged, grilled',            price: 24.00, image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'mains' },
+        { id: 'i4', name: 'Margherita Pizza', description: 'Tomato, mozzarella, basil',     price: 12.50, image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'mains' },
+        { id: 'i5', name: 'Carbonara',        description: 'Guanciale, pecorino, egg',      price: 14.00, image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'mains' },
+        { id: 'i6', name: 'Risotto Funghi',   description: 'Arborio, porcini, parmesan',    price: 13.50, image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'mains' },
+        { id: 'i7', name: 'Grilled Salmon',   description: 'Lemon butter, asparagus',       price: 19.50, image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'mains' },
+        { id: 'i8', name: 'Tiramisu',         description: 'Espresso, mascarpone',          price: 6.50,  image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'desserts' },
+        { id: 'i9', name: 'Panna Cotta',      description: 'Vanilla, berry coulis',         price: 6.00,  image: PLACEHOLDER, categoryId: 'food',   subcategoryId: 'desserts' },
+        { id: 'd1', name: 'Coca-Cola',        description: '330ml can',                     price: 3.00,  image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'soft' },
+        { id: 'd2', name: 'Sparkling Water',  description: '500ml bottle',                  price: 2.50,  image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'soft' },
+        { id: 'd3', name: 'House Red',        description: '150ml glass',                   price: 6.00,  image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'bar' },
+        { id: 'd4', name: 'House White',      description: '150ml glass',                   price: 6.00,  image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'bar' },
+        { id: 'd5', name: 'Old Fashioned',    description: 'Bourbon, bitters, sugar',       price: 10.00, image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'bar' },
+        { id: 'd6', name: 'Negroni',          description: 'Gin, vermouth, campari',        price: 10.50, image: PLACEHOLDER, categoryId: 'drinks', subcategoryId: 'bar' },
+      ],
+
+      onItemAdd:      function (line, section) { log("+ Added " + line.item.name + " to " + section); },
+      onBasketChange: function (basket)        { log("basket lines: " + basket.length); },
+      onSendOrder:    function (order, done)   {
+        log("SEND ORDER", { serving: order.serving, lines: order.basket.length, total: order.total });
+        setTimeout(done, 400);
+      },
+      onNextServing:  function () { log("next serving"); }
+    });
+
+    window.menu = menu;
+  </script>
+</body>
+</html>
