@@ -48,6 +48,59 @@ var RestaurantMenu = (function () {
     MenuBrowse.build($shell);
     MenuBasket.build($shell);
 
+    // Floating basket toggle (tablet / small screens only — CSS-hidden on desktop)
+    var $fab = MenuRender.buildBasketFab(cfg.labels);
+    $shell.append($fab);
+
+    // ── Drawer toggle (push animation on tablet / mobile) ─────
+    var _escHandler = null;
+    function openBasket() {
+      if ($shell.hasClass("rm-wrapper--basket-open")) return;
+      $shell.addClass("rm-wrapper--basket-open");
+      jQuery("body").css("overflow", "hidden");
+      _escHandler = function (e) { if (e.key === "Escape") closeBasket(); };
+      jQuery(document).on("keydown.rmdrawer", _escHandler);
+    }
+    function closeBasket() {
+      if (!$shell.hasClass("rm-wrapper--basket-open")) return;
+      $shell.removeClass("rm-wrapper--basket-open");
+      jQuery("body").css("overflow", "");
+      jQuery(document).off("keydown.rmdrawer");
+      _escHandler = null;
+    }
+    function toggleBasket() {
+      if ($shell.hasClass("rm-wrapper--basket-open")) closeBasket(); else openBasket();
+    }
+
+    $fab.on("click", openBasket);
+    $shell.on("click", "." + MenuRender.ns("backdrop"), closeBasket);
+    $shell.on("click", "." + MenuRender.ns("basket-close"), closeBasket);
+
+    // Keep FAB count badge in sync with basket
+    function _syncFab() {
+      var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
+      $fab.find("." + MenuRender.ns("basket-fab-count")).text(count);
+      $fab.toggleClass(MenuRender.ns("basket-fab--has-count"), count > 0);
+    }
+    _syncFab();
+    MenuEvents.on("basket:changed", _syncFab);
+
+    // ── Keep --rm-table-slot-h in sync so .rm-right top/max-height stay correct
+    var $slot = $shell.find("." + MenuRender.ns("table-slot"));
+    function _syncSlotHeight() {
+      var h = $slot.outerHeight() || 0;
+      // Include the 16px gap between slot and body.
+      $container[0].style.setProperty("--rm-table-slot-h", (h + 16) + "px");
+    }
+    _syncSlotHeight();
+    var _slotRO = null;
+    if (typeof ResizeObserver !== "undefined" && $slot[0]) {
+      _slotRO = new ResizeObserver(_syncSlotHeight);
+      _slotRO.observe($slot[0]);
+    }
+    jQuery(window).on("resize.rmslot", _syncSlotHeight);
+    MenuEvents.on("table:changed", function () { setTimeout(_syncSlotHeight, 0); });
+
     // Wire internal → user callbacks
     MenuEvents.on("basket:changed", function (evt) {
       var basket = MenuCore.getBasket();
@@ -92,6 +145,12 @@ var RestaurantMenu = (function () {
         jQuery("#" + cfg.containerId).toggleClass("rm-root--fancy", !!on);
       },
 
+      // Basket drawer (tablet / mobile push animation)
+      openBasket:   openBasket,
+      closeBasket:  closeBasket,
+      toggleBasket: toggleBasket,
+      isBasketOpen: function () { return $shell.hasClass("rm-wrapper--basket-open"); },
+
       // Live data updates (no re-create)
       updateItems:           function (items)    { MenuCore.setItems(items); },
       updateCategories:      function (cats)     { MenuCore.setCategories(cats); },
@@ -128,6 +187,10 @@ var RestaurantMenu = (function () {
       destroy: function () {
         MenuBrowse.unbind();
         MenuBasket.unbind();
+        if (_slotRO) { try { _slotRO.disconnect(); } catch (e) {} }
+        jQuery(window).off("resize.rmslot");
+        jQuery(document).off("keydown.rmdrawer");
+        jQuery("body").css("overflow", "");
         jQuery("#" + cfg.containerId).empty().removeClass("rm-root");
         MenuEvents.reset();
         MenuCore.reset();

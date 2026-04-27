@@ -9,9 +9,20 @@ var MenuRender = (function () {
   // ── Shell ─────────────────────────────────────────
   function buildShell() {
     return jQuery("<div>").addClass(ns("wrapper")).append(
-      jQuery("<div>").addClass(ns("left")),
-      jQuery("<div>").addClass(ns("right"))
+      jQuery("<div>").addClass(ns("table-slot")),
+      jQuery("<div>").addClass(ns("body")).append(
+        jQuery("<div>").addClass(ns("left")),
+        jQuery("<div>").addClass(ns("right")),
+        jQuery("<div>").addClass(ns("backdrop"))
+      )
     );
+  }
+
+  function buildBasketFab(labels) {
+    return jQuery("<button type='button'>").addClass(ns("basket-fab"))
+      .attr("aria-label", (labels && labels.basket) || "Basket")
+      .append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"))
+      .append(jQuery("<span>").addClass(ns("basket-fab-count")));
   }
 
   // ── Table info header ─────────────────────────────
@@ -290,6 +301,7 @@ var MenuRender = (function () {
   return {
     ns: ns,
     buildShell: buildShell,
+    buildBasketFab: buildBasketFab,
     buildTableInfo: buildTableInfo,
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,

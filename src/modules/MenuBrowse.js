@@ -10,9 +10,10 @@ var MenuBrowse = (function () {
     _$root = $root;
     var cfg = MenuCore.getConfig();
     var $left = $root.find("." + MenuRender.ns("left"));
+    var $slot = $root.find("." + MenuRender.ns("table-slot"));
 
+    $slot.empty().append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     $left.empty();
-    $left.append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     if (cfg.showSearch) $left.append(MenuRender.buildSearchRow(cfg));
     $left.append(
       MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
@@ -79,8 +80,8 @@ var MenuBrowse = (function () {
 
   function _renderTableInfo() {
     var cfg = MenuCore.getConfig();
-    _$root.find("." + MenuRender.ns("table-info"))
-      .replaceWith(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
+    _$root.find("." + MenuRender.ns("table-slot")).empty()
+      .append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
   }
 
   function _renderSubTabs() {

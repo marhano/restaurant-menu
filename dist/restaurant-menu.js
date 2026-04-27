@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-24T08:51:51.317Z
+ * Built: 2026-04-27T06:14:54.065Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -606,9 +606,20 @@ var MenuRender = (function () {
   // ── Shell ─────────────────────────────────────────
   function buildShell() {
     return jQuery("<div>").addClass(ns("wrapper")).append(
-      jQuery("<div>").addClass(ns("left")),
-      jQuery("<div>").addClass(ns("right"))
+      jQuery("<div>").addClass(ns("table-slot")),
+      jQuery("<div>").addClass(ns("body")).append(
+        jQuery("<div>").addClass(ns("left")),
+        jQuery("<div>").addClass(ns("right")),
+        jQuery("<div>").addClass(ns("backdrop"))
+      )
     );
+  }
+
+  function buildBasketFab(labels) {
+    return jQuery("<button type='button'>").addClass(ns("basket-fab"))
+      .attr("aria-label", (labels && labels.basket) || "Basket")
+      .append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"))
+      .append(jQuery("<span>").addClass(ns("basket-fab-count")));
   }
 
   // ── Table info header ─────────────────────────────
@@ -887,6 +898,7 @@ var MenuRender = (function () {
   return {
     ns: ns,
     buildShell: buildShell,
+    buildBasketFab: buildBasketFab,
     buildTableInfo: buildTableInfo,
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
@@ -916,9 +928,10 @@ var MenuBrowse = (function () {
     _$root = $root;
     var cfg = MenuCore.getConfig();
     var $left = $root.find("." + MenuRender.ns("left"));
+    var $slot = $root.find("." + MenuRender.ns("table-slot"));
 
+    $slot.empty().append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     $left.empty();
-    $left.append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     if (cfg.showSearch) $left.append(MenuRender.buildSearchRow(cfg));
     $left.append(
       MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
@@ -985,8 +998,8 @@ var MenuBrowse = (function () {
 
   function _renderTableInfo() {
     var cfg = MenuCore.getConfig();
-    _$root.find("." + MenuRender.ns("table-info"))
-      .replaceWith(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
+    _$root.find("." + MenuRender.ns("table-slot")).empty()
+      .append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
   }
 
   function _renderSubTabs() {
@@ -1273,11 +1286,19 @@ var MenuBasket = (function () {
 
   function _renderHeader() {
     var cfg = MenuCore.getConfig();
-    var $h = _$root.find("." + MenuRender.ns("basket-header")).empty();
+    var ns = MenuRender.ns;
+    var $h = _$root.find("." + ns("basket-header")).empty();
     $h.append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"));
-    $h.append(jQuery("<span>").addClass(MenuRender.ns("basket-title")).text("Order"));
+    $h.append(jQuery("<span>").addClass(ns("basket-title")).text("Order"));
     var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
-    if (count) $h.append(jQuery("<span>").addClass(MenuRender.ns("basket-count")).text(count));
+    if (count) $h.append(jQuery("<span>").addClass(ns("basket-count")).text(count));
+
+    // Close button (CSS hides on desktop, shows on tablet drawer)
+    $h.append(
+      jQuery("<button type='button'>").addClass(ns("basket-close"))
+        .attr("aria-label", (cfg.labels && cfg.labels.cancel) || "Close")
+        .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
+    );
   }
 
   function _renderTabs() {
@@ -1526,6 +1547,59 @@ var RestaurantMenu = (function () {
     MenuBrowse.build($shell);
     MenuBasket.build($shell);
 
+    // Floating basket toggle (tablet / small screens only — CSS-hidden on desktop)
+    var $fab = MenuRender.buildBasketFab(cfg.labels);
+    $shell.append($fab);
+
+    // ── Drawer toggle (push animation on tablet / mobile) ─────
+    var _escHandler = null;
+    function openBasket() {
+      if ($shell.hasClass("rm-wrapper--basket-open")) return;
+      $shell.addClass("rm-wrapper--basket-open");
+      jQuery("body").css("overflow", "hidden");
+      _escHandler = function (e) { if (e.key === "Escape") closeBasket(); };
+      jQuery(document).on("keydown.rmdrawer", _escHandler);
+    }
+    function closeBasket() {
+      if (!$shell.hasClass("rm-wrapper--basket-open")) return;
+      $shell.removeClass("rm-wrapper--basket-open");
+      jQuery("body").css("overflow", "");
+      jQuery(document).off("keydown.rmdrawer");
+      _escHandler = null;
+    }
+    function toggleBasket() {
+      if ($shell.hasClass("rm-wrapper--basket-open")) closeBasket(); else openBasket();
+    }
+
+    $fab.on("click", openBasket);
+    $shell.on("click", "." + MenuRender.ns("backdrop"), closeBasket);
+    $shell.on("click", "." + MenuRender.ns("basket-close"), closeBasket);
+
+    // Keep FAB count badge in sync with basket
+    function _syncFab() {
+      var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
+      $fab.find("." + MenuRender.ns("basket-fab-count")).text(count);
+      $fab.toggleClass(MenuRender.ns("basket-fab--has-count"), count > 0);
+    }
+    _syncFab();
+    MenuEvents.on("basket:changed", _syncFab);
+
+    // ── Keep --rm-table-slot-h in sync so .rm-right top/max-height stay correct
+    var $slot = $shell.find("." + MenuRender.ns("table-slot"));
+    function _syncSlotHeight() {
+      var h = $slot.outerHeight() || 0;
+      // Include the 16px gap between slot and body.
+      $container[0].style.setProperty("--rm-table-slot-h", (h + 16) + "px");
+    }
+    _syncSlotHeight();
+    var _slotRO = null;
+    if (typeof ResizeObserver !== "undefined" && $slot[0]) {
+      _slotRO = new ResizeObserver(_syncSlotHeight);
+      _slotRO.observe($slot[0]);
+    }
+    jQuery(window).on("resize.rmslot", _syncSlotHeight);
+    MenuEvents.on("table:changed", function () { setTimeout(_syncSlotHeight, 0); });
+
     // Wire internal → user callbacks
     MenuEvents.on("basket:changed", function (evt) {
       var basket = MenuCore.getBasket();
@@ -1570,6 +1644,12 @@ var RestaurantMenu = (function () {
         jQuery("#" + cfg.containerId).toggleClass("rm-root--fancy", !!on);
       },
 
+      // Basket drawer (tablet / mobile push animation)
+      openBasket:   openBasket,
+      closeBasket:  closeBasket,
+      toggleBasket: toggleBasket,
+      isBasketOpen: function () { return $shell.hasClass("rm-wrapper--basket-open"); },
+
       // Live data updates (no re-create)
       updateItems:           function (items)    { MenuCore.setItems(items); },
       updateCategories:      function (cats)     { MenuCore.setCategories(cats); },
@@ -1606,6 +1686,10 @@ var RestaurantMenu = (function () {
       destroy: function () {
         MenuBrowse.unbind();
         MenuBasket.unbind();
+        if (_slotRO) { try { _slotRO.disconnect(); } catch (e) {} }
+        jQuery(window).off("resize.rmslot");
+        jQuery(document).off("keydown.rmdrawer");
+        jQuery("body").css("overflow", "");
         jQuery("#" + cfg.containerId).empty().removeClass("rm-root");
         MenuEvents.reset();
         MenuCore.reset();

@@ -33,11 +33,19 @@ var MenuBasket = (function () {
 
   function _renderHeader() {
     var cfg = MenuCore.getConfig();
-    var $h = _$root.find("." + MenuRender.ns("basket-header")).empty();
+    var ns = MenuRender.ns;
+    var $h = _$root.find("." + ns("basket-header")).empty();
     $h.append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"));
-    $h.append(jQuery("<span>").addClass(MenuRender.ns("basket-title")).text("Order"));
+    $h.append(jQuery("<span>").addClass(ns("basket-title")).text("Order"));
     var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
-    if (count) $h.append(jQuery("<span>").addClass(MenuRender.ns("basket-count")).text(count));
+    if (count) $h.append(jQuery("<span>").addClass(ns("basket-count")).text(count));
+
+    // Close button (CSS hides on desktop, shows on tablet drawer)
+    $h.append(
+      jQuery("<button type='button'>").addClass(ns("basket-close"))
+        .attr("aria-label", (cfg.labels && cfg.labels.cancel) || "Close")
+        .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
+    );
   }
 
   function _renderTabs() {
