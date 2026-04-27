@@ -37,3 +37,16 @@ console.log("JS  -> dist/restaurant-menu.js (" + (bundle.length / 1024).toFixed(
 var css = fs.readFileSync("./restaurant-menu.css", "utf8");
 fs.writeFileSync("./dist/restaurant-menu.css", css, "utf8");
 console.log("CSS -> dist/restaurant-menu.css");
+
+// --- Copy to MVC project static assets ---
+var mvcDir = "C:/Users/marjan.carullo/source/repos/OmniBusiness/OmniBusiness/wwwroot/libs/restaurant-menu/";
+try {
+  fs.mkdirSync(mvcDir, { recursive: true });
+  fs.copyFileSync("./dist/restaurant-menu.js", path.join(mvcDir, "restaurant-menu.js"));
+  fs.copyFileSync("./dist/restaurant-menu.css", path.join(mvcDir, "restaurant-menu.css"));
+  console.log("\u2705 Copied to MVC: " + mvcDir);
+} catch (e) {
+  console.error("\u26A0\uFE0F Failed to copy to MVC project:", e.message);
+}
+console.log("✅ CSS → dist/restaurant-menu.css");
+

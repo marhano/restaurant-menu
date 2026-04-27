@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-27T06:14:54.065Z
+ * Built: 2026-04-27T07:41:55.178Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -38,6 +38,11 @@ var MenuConfig = (function () {
       position: "prefix", // prefix | suffix
       decimals: 2,
     },
+
+    // When true: subcategories become the top-level tab navigation and items
+    // are filtered by subcategoryId only (categoryId is ignored). Useful when
+    // all items share a single categoryId (e.g. "SERVICES").
+    subcategoryNav: false,
 
     // UI toggles
     showSearch: true,
@@ -125,8 +130,53 @@ var MenuConfig = (function () {
     onTableChange: null, // (table)
   };
 
+  // Accept either PascalCase (C# serialized) or camelCase for the same property.
+  function _v(pascal, camel) {
+    return pascal !== undefined ? pascal : camel;
+  }
+
+  function normalizeCategory(c) {
+    var subs = _v(c.SubCategories, c.subcategories);
+    return {
+      id:            _v(c.Id,            c.id)            || "",
+      label:         _v(c.Label,         c.label)         || "",
+      icon:          _v(c.Icon,          c.icon)          || "",
+      basketSection: _v(c.BasketSection, c.basketSection) || "",
+      subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
+    };
+  }
+
+  function normalizeSubcategory(s) {
+    return {
+      id:            _v(s.Id,            s.id)            || "",
+      label:         _v(s.Label,         s.label)         || "",
+      basketSection: _v(s.BasketSection, s.basketSection) || ""
+    };
+  }
+
+  function normalizeItem(it) {
+    var price = _v(it.Price, it.price);
+    return {
+      id:            _v(it.Id,            it.id)            || "",
+      name:          _v(it.Name,          it.name)          || "",
+      description:   _v(it.Description,   it.description)   || "",
+      price:         price != null ? price : 0,
+      image:         _v(it.Image,         it.image)         || "",
+      categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
+      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || "",
+      basketSection: _v(it.BasketSection, it.basketSection) || ""
+    };
+  }
+
   function merge(userCfg) {
     var out = jQuery.extend(true, {}, _defaults, userCfg || {});
+    // Normalize categories and items to camelCase regardless of input casing
+    if (Array.isArray(out.categories)) {
+      out.categories = out.categories.map(normalizeCategory);
+    }
+    if (Array.isArray(out.items)) {
+      out.items = out.items.map(normalizeItem);
+    }
     // Normalize callable sections
     if (!Array.isArray(out.basketSections) || !out.basketSections.length) {
       out.basketSections = _defaults.basketSections.slice();
@@ -137,7 +187,11 @@ var MenuConfig = (function () {
     return out;
   }
 
-  return { merge: merge };
+  return {
+    merge: merge,
+    normalizeCategory: normalizeCategory,
+    normalizeItem: normalizeItem
+  };
 })();
 
 
@@ -225,13 +279,13 @@ var MenuCore = (function () {
 
   function setItems(items) {
     if (!_cfg) return;
-    _cfg.items = Array.isArray(items) ? items.slice() : [];
+    _cfg.items = Array.isArray(items) ? items.map(MenuConfig.normalizeItem) : [];
     MenuEvents.emit("menu:changed", { reason: "items" });
   }
 
   function setCategories(cats) {
     if (!_cfg) return;
-    _cfg.categories = Array.isArray(cats) ? cats.slice() : [];
+    _cfg.categories = Array.isArray(cats) ? cats.map(MenuConfig.normalizeCategory) : [];
     // Reconcile active selection
     var list = _cfg.categories;
     var exists = list.some(function (c) { return c.id === _activeCategoryId; });
@@ -289,6 +343,16 @@ var MenuCore = (function () {
     return (c && c.subcategories) ? c.subcategories : [];
   }
 
+  function getAllSubcategories() {
+    var out = [];
+    getCategories().forEach(function (c) {
+      if (Array.isArray(c.subcategories)) {
+        c.subcategories.forEach(function (s) { out.push(s); });
+      }
+    });
+    return out;
+  }
+
   function getItems() { return _cfg ? _cfg.items || [] : []; }
 
   function getItemById(id) {
@@ -305,7 +369,17 @@ var MenuCore = (function () {
     var out = items.filter(function (it) {
       // When searching, scan the whole menu (ignore category/subcategory).
       if (!hasSearch) {
-        if (_activeCategoryId && it.categoryId !== _activeCategoryId) return false;
+        if (_activeCategoryId && !_cfg.subcategoryNav) {
+          var _cat = getCategory(_activeCategoryId);
+          var _subIds = (_cat && Array.isArray(_cat.subcategories))
+            ? _cat.subcategories.map(function (s) { return s.id; })
+            : [];
+          // Match by categoryId directly OR by the item's subcategoryId belonging
+          // to this category — supports items that carry no categoryId.
+          var _byCat = it.categoryId === _activeCategoryId;
+          var _bySub = _subIds.length > 0 && _subIds.indexOf(it.subcategoryId) !== -1;
+          if (!_byCat && !_bySub) return false;
+        }
         if (_activeSubcategoryId && it.subcategoryId !== _activeSubcategoryId) return false;
       }
       if (hasSearch) {
@@ -546,6 +620,7 @@ var MenuCore = (function () {
     getCategories: getCategories,
     getCategory: getCategory,
     getSubcategories: getSubcategories,
+    getAllSubcategories: getAllSubcategories,
     getItems: getItems,
     getItemById: getItemById,
     getFilteredItems: getFilteredItems,
@@ -744,6 +819,28 @@ var MenuRender = (function () {
     return $wrap;
   }
 
+  // ── Subcategory-as-category tabs (subcategoryNav mode) ───────────────────
+  function buildSubcategoryNavTabs(subcategories, activeSubId, allLabel) {
+    var $wrap = jQuery("<div>").addClass(ns("cat-tabs"));
+    $wrap.append(
+      jQuery("<button>")
+        .addClass(ns("cat-tab"))
+        .toggleClass(ns("cat-tab--active"), !activeSubId)
+        .attr("data-sub-id", "")
+        .append(jQuery("<span>").text(allLabel || "All"))
+    );
+    subcategories.forEach(function (s) {
+      var $tab = jQuery("<button>")
+        .addClass(ns("cat-tab"))
+        .attr("data-sub-id", s.id)
+        .toggleClass(ns("cat-tab--active"), s.id === activeSubId);
+      if (s.icon) $tab.append(jQuery("<i>").addClass(s.icon + " " + ns("cat-tab-icon")));
+      $tab.append(jQuery("<span>").text(s.label || s.id));
+      $wrap.append($tab);
+    });
+    return $wrap;
+  }
+
   // ── Sub-category pills ────────────────────────────
   function buildSubTabs(subs, activeId, allLabel) {
     var $wrap = jQuery("<div>").addClass(ns("sub-tabs"));
@@ -903,6 +1000,7 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
+    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,
@@ -933,16 +1031,26 @@ var MenuBrowse = (function () {
     $slot.empty().append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     $left.empty();
     if (cfg.showSearch) $left.append(MenuRender.buildSearchRow(cfg));
-    $left.append(
-      MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
-    );
-    $left.append(
-      MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
-        MenuCore.getActiveSubcategoryId(),
-        cfg.labels.all
-      )
-    );
+    if (cfg.subcategoryNav) {
+      $left.append(
+        MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        )
+      );
+    } else {
+      $left.append(
+        MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
+      );
+      $left.append(
+        MenuRender.buildSubTabs(
+          MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        )
+      );
+    }
     $left.append(MenuRender.buildItemGrid());
 
     _applySearchState();
@@ -985,14 +1093,23 @@ var MenuBrowse = (function () {
 
   function _refreshMenu() {
     var cfg = MenuCore.getConfig();
-    _$root.find("." + MenuRender.ns("cat-tabs"))
-      .replaceWith(MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId()));
-    _$root.find("." + MenuRender.ns("sub-tabs"))
-      .replaceWith(MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
-        MenuCore.getActiveSubcategoryId(),
-        cfg.labels.all
-      ));
+    if (cfg.subcategoryNav) {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+    } else {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId()));
+      _$root.find("." + MenuRender.ns("sub-tabs"))
+        .replaceWith(MenuRender.buildSubTabs(
+          MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+    }
     _renderItems();
   }
 
@@ -1004,6 +1121,15 @@ var MenuBrowse = (function () {
 
   function _renderSubTabs() {
     var cfg = MenuCore.getConfig();
+    if (cfg.subcategoryNav) {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+      return;
+    }
     _$root.find("." + MenuRender.ns("sub-tabs"))
       .replaceWith(MenuRender.buildSubTabs(
         MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
@@ -1040,7 +1166,12 @@ var MenuBrowse = (function () {
     });
 
     _$root.on("click", "." + ns("cat-tab"), function () {
-      MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+      var cfg = MenuCore.getConfig();
+      if (cfg.subcategoryNav) {
+        MenuCore.setSubcategory(jQuery(this).attr("data-sub-id"));
+      } else {
+        MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+      }
     });
 
     _$root.on("click", "." + ns("sub-tab"), function () {

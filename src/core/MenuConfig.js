@@ -30,6 +30,11 @@ var MenuConfig = (function () {
       decimals: 2,
     },
 
+    // When true: subcategories become the top-level tab navigation and items
+    // are filtered by subcategoryId only (categoryId is ignored). Useful when
+    // all items share a single categoryId (e.g. "SERVICES").
+    subcategoryNav: false,
+
     // UI toggles
     showSearch: true,
     showFilter: true,
@@ -116,8 +121,53 @@ var MenuConfig = (function () {
     onTableChange: null, // (table)
   };
 
+  // Accept either PascalCase (C# serialized) or camelCase for the same property.
+  function _v(pascal, camel) {
+    return pascal !== undefined ? pascal : camel;
+  }
+
+  function normalizeCategory(c) {
+    var subs = _v(c.SubCategories, c.subcategories);
+    return {
+      id:            _v(c.Id,            c.id)            || "",
+      label:         _v(c.Label,         c.label)         || "",
+      icon:          _v(c.Icon,          c.icon)          || "",
+      basketSection: _v(c.BasketSection, c.basketSection) || "",
+      subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
+    };
+  }
+
+  function normalizeSubcategory(s) {
+    return {
+      id:            _v(s.Id,            s.id)            || "",
+      label:         _v(s.Label,         s.label)         || "",
+      basketSection: _v(s.BasketSection, s.basketSection) || ""
+    };
+  }
+
+  function normalizeItem(it) {
+    var price = _v(it.Price, it.price);
+    return {
+      id:            _v(it.Id,            it.id)            || "",
+      name:          _v(it.Name,          it.name)          || "",
+      description:   _v(it.Description,   it.description)   || "",
+      price:         price != null ? price : 0,
+      image:         _v(it.Image,         it.image)         || "",
+      categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
+      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || "",
+      basketSection: _v(it.BasketSection, it.basketSection) || ""
+    };
+  }
+
   function merge(userCfg) {
     var out = jQuery.extend(true, {}, _defaults, userCfg || {});
+    // Normalize categories and items to camelCase regardless of input casing
+    if (Array.isArray(out.categories)) {
+      out.categories = out.categories.map(normalizeCategory);
+    }
+    if (Array.isArray(out.items)) {
+      out.items = out.items.map(normalizeItem);
+    }
     // Normalize callable sections
     if (!Array.isArray(out.basketSections) || !out.basketSections.length) {
       out.basketSections = _defaults.basketSections.slice();
@@ -128,5 +178,9 @@ var MenuConfig = (function () {
     return out;
   }
 
-  return { merge: merge };
+  return {
+    merge: merge,
+    normalizeCategory: normalizeCategory,
+    normalizeItem: normalizeItem
+  };
 })();

@@ -147,6 +147,28 @@ var MenuRender = (function () {
     return $wrap;
   }
 
+  // ── Subcategory-as-category tabs (subcategoryNav mode) ───────────────────
+  function buildSubcategoryNavTabs(subcategories, activeSubId, allLabel) {
+    var $wrap = jQuery("<div>").addClass(ns("cat-tabs"));
+    $wrap.append(
+      jQuery("<button>")
+        .addClass(ns("cat-tab"))
+        .toggleClass(ns("cat-tab--active"), !activeSubId)
+        .attr("data-sub-id", "")
+        .append(jQuery("<span>").text(allLabel || "All"))
+    );
+    subcategories.forEach(function (s) {
+      var $tab = jQuery("<button>")
+        .addClass(ns("cat-tab"))
+        .attr("data-sub-id", s.id)
+        .toggleClass(ns("cat-tab--active"), s.id === activeSubId);
+      if (s.icon) $tab.append(jQuery("<i>").addClass(s.icon + " " + ns("cat-tab-icon")));
+      $tab.append(jQuery("<span>").text(s.label || s.id));
+      $wrap.append($tab);
+    });
+    return $wrap;
+  }
+
   // ── Sub-category pills ────────────────────────────
   function buildSubTabs(subs, activeId, allLabel) {
     var $wrap = jQuery("<div>").addClass(ns("sub-tabs"));
@@ -306,6 +328,7 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
+    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,

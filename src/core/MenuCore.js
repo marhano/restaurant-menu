@@ -51,13 +51,13 @@ var MenuCore = (function () {
 
   function setItems(items) {
     if (!_cfg) return;
-    _cfg.items = Array.isArray(items) ? items.slice() : [];
+    _cfg.items = Array.isArray(items) ? items.map(MenuConfig.normalizeItem) : [];
     MenuEvents.emit("menu:changed", { reason: "items" });
   }
 
   function setCategories(cats) {
     if (!_cfg) return;
-    _cfg.categories = Array.isArray(cats) ? cats.slice() : [];
+    _cfg.categories = Array.isArray(cats) ? cats.map(MenuConfig.normalizeCategory) : [];
     // Reconcile active selection
     var list = _cfg.categories;
     var exists = list.some(function (c) { return c.id === _activeCategoryId; });
@@ -115,6 +115,16 @@ var MenuCore = (function () {
     return (c && c.subcategories) ? c.subcategories : [];
   }
 
+  function getAllSubcategories() {
+    var out = [];
+    getCategories().forEach(function (c) {
+      if (Array.isArray(c.subcategories)) {
+        c.subcategories.forEach(function (s) { out.push(s); });
+      }
+    });
+    return out;
+  }
+
   function getItems() { return _cfg ? _cfg.items || [] : []; }
 
   function getItemById(id) {
@@ -131,7 +141,17 @@ var MenuCore = (function () {
     var out = items.filter(function (it) {
       // When searching, scan the whole menu (ignore category/subcategory).
       if (!hasSearch) {
-        if (_activeCategoryId && it.categoryId !== _activeCategoryId) return false;
+        if (_activeCategoryId && !_cfg.subcategoryNav) {
+          var _cat = getCategory(_activeCategoryId);
+          var _subIds = (_cat && Array.isArray(_cat.subcategories))
+            ? _cat.subcategories.map(function (s) { return s.id; })
+            : [];
+          // Match by categoryId directly OR by the item's subcategoryId belonging
+          // to this category — supports items that carry no categoryId.
+          var _byCat = it.categoryId === _activeCategoryId;
+          var _bySub = _subIds.length > 0 && _subIds.indexOf(it.subcategoryId) !== -1;
+          if (!_byCat && !_bySub) return false;
+        }
         if (_activeSubcategoryId && it.subcategoryId !== _activeSubcategoryId) return false;
       }
       if (hasSearch) {
@@ -372,6 +392,7 @@ var MenuCore = (function () {
     getCategories: getCategories,
     getCategory: getCategory,
     getSubcategories: getSubcategories,
+    getAllSubcategories: getAllSubcategories,
     getItems: getItems,
     getItemById: getItemById,
     getFilteredItems: getFilteredItems,

@@ -15,16 +15,26 @@ var MenuBrowse = (function () {
     $slot.empty().append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
     $left.empty();
     if (cfg.showSearch) $left.append(MenuRender.buildSearchRow(cfg));
-    $left.append(
-      MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
-    );
-    $left.append(
-      MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
-        MenuCore.getActiveSubcategoryId(),
-        cfg.labels.all
-      )
-    );
+    if (cfg.subcategoryNav) {
+      $left.append(
+        MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        )
+      );
+    } else {
+      $left.append(
+        MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
+      );
+      $left.append(
+        MenuRender.buildSubTabs(
+          MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        )
+      );
+    }
     $left.append(MenuRender.buildItemGrid());
 
     _applySearchState();
@@ -67,14 +77,23 @@ var MenuBrowse = (function () {
 
   function _refreshMenu() {
     var cfg = MenuCore.getConfig();
-    _$root.find("." + MenuRender.ns("cat-tabs"))
-      .replaceWith(MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId()));
-    _$root.find("." + MenuRender.ns("sub-tabs"))
-      .replaceWith(MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
-        MenuCore.getActiveSubcategoryId(),
-        cfg.labels.all
-      ));
+    if (cfg.subcategoryNav) {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+    } else {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId()));
+      _$root.find("." + MenuRender.ns("sub-tabs"))
+        .replaceWith(MenuRender.buildSubTabs(
+          MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+    }
     _renderItems();
   }
 
@@ -86,6 +105,15 @@ var MenuBrowse = (function () {
 
   function _renderSubTabs() {
     var cfg = MenuCore.getConfig();
+    if (cfg.subcategoryNav) {
+      _$root.find("." + MenuRender.ns("cat-tabs"))
+        .replaceWith(MenuRender.buildSubcategoryNavTabs(
+          MenuCore.getAllSubcategories(),
+          MenuCore.getActiveSubcategoryId(),
+          cfg.labels.all
+        ));
+      return;
+    }
     _$root.find("." + MenuRender.ns("sub-tabs"))
       .replaceWith(MenuRender.buildSubTabs(
         MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
@@ -122,7 +150,12 @@ var MenuBrowse = (function () {
     });
 
     _$root.on("click", "." + ns("cat-tab"), function () {
-      MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+      var cfg = MenuCore.getConfig();
+      if (cfg.subcategoryNav) {
+        MenuCore.setSubcategory(jQuery(this).attr("data-sub-id"));
+      } else {
+        MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+      }
     });
 
     _$root.on("click", "." + ns("sub-tab"), function () {
