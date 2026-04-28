@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-28T02:47:24.517Z
+ * Built: 2026-04-28T06:39:55.622Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -581,6 +581,35 @@ var MenuCore = (function () {
     MenuEvents.emit("basket:changed", { reason: "clear" });
   }
 
+  /**
+   * Bulk-load lines into the basket, replacing whatever was there.
+   * Each entry: { itemId, qty, note, sectionId }
+   * Unknown itemIds are silently skipped.
+   */
+  function setBasket(lines) {
+    _basket = [];
+    _lineSeq = 1;
+    if (!Array.isArray(lines)) {
+      MenuEvents.emit("basket:changed", { reason: "clear" });
+      return;
+    }
+    lines.forEach(function (entry) {
+      var item = getItemById(entry.ProductId);
+      if (!item) {
+        console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
+        return;
+      }
+      _basket.push({
+        lineId: "L" + (_lineSeq++),
+        item: jQuery.extend(true, {}, item),
+        qty: Math.max(1, parseInt(entry.Quantity, 10) || 1),
+        note: entry.Note || "",
+        sectionId: resolveSection(item, null)
+      });
+    });
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
   // ── Table & serving ───────────────────────────────
 
   function getTable() { return _table ? jQuery.extend(true, {}, _table) : null; }
@@ -654,6 +683,7 @@ var MenuCore = (function () {
     getBasketTotal: getBasketTotal,
     getSectionTotal: getSectionTotal,
     addItem: addItem,
+    setBasket: setBasket,
     incQty: incQty,
     decQty: decQty,
     removeLine: removeLine,
@@ -1744,6 +1774,7 @@ var RestaurantMenu = (function () {
     // ── Modal open / close ────────────────────────────────────────────────
     function openMenuModal() {
       if (!cfg.modal || _menuModalOpen) return;
+      MenuCore.clearBasket();
       _menuModalOpen = true;
       $menuOverlay.addClass("rm-menu-overlay--open");
       jQuery("body").css("overflow", "hidden");
@@ -1848,6 +1879,7 @@ var RestaurantMenu = (function () {
       startNewOrder:    function (table) { MenuCore.startNewOrder(table); },
 
       // Basket ops
+      loadBasket:       function (lines) { MenuCore.setBasket(lines); },
       addItem:          function (itemId, sectionId) { return MenuCore.addItem(itemId, sectionId); },
       incQty:           function (lineId) { MenuCore.incQty(lineId); },
       decQty:           function (lineId) { MenuCore.decQty(lineId); },

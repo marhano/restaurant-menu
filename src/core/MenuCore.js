@@ -349,6 +349,35 @@ var MenuCore = (function () {
     MenuEvents.emit("basket:changed", { reason: "clear" });
   }
 
+  /**
+   * Bulk-load lines into the basket, replacing whatever was there.
+   * Each entry: { itemId, qty, note, sectionId }
+   * Unknown itemIds are silently skipped.
+   */
+  function setBasket(lines) {
+    _basket = [];
+    _lineSeq = 1;
+    if (!Array.isArray(lines)) {
+      MenuEvents.emit("basket:changed", { reason: "clear" });
+      return;
+    }
+    lines.forEach(function (entry) {
+      var item = getItemById(entry.ProductId);
+      if (!item) {
+        console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
+        return;
+      }
+      _basket.push({
+        lineId: "L" + (_lineSeq++),
+        item: jQuery.extend(true, {}, item),
+        qty: Math.max(1, parseInt(entry.Quantity, 10) || 1),
+        note: entry.Note || "",
+        sectionId: resolveSection(item, null)
+      });
+    });
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
   // ── Table & serving ───────────────────────────────
 
   function getTable() { return _table ? jQuery.extend(true, {}, _table) : null; }
@@ -422,6 +451,7 @@ var MenuCore = (function () {
     getBasketTotal: getBasketTotal,
     getSectionTotal: getSectionTotal,
     addItem: addItem,
+    setBasket: setBasket,
     incQty: incQty,
     decQty: decQty,
     removeLine: removeLine,
