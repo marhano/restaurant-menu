@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-27T07:41:55.178Z
+ * Built: 2026-04-28T02:47:24.517Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -38,6 +38,10 @@ var MenuConfig = (function () {
       position: "prefix", // prefix | suffix
       decimals: 2,
     },
+
+    // When true the menu renders inside a fullscreen modal overlay that starts
+    // hidden. Call menu.openModal() / menu.closeModal() to control it.
+    modal: false,
 
     // When true: subcategories become the top-level tab navigation and items
     // are filtered by subcategoryId only (categoryId is ignored). Useful when
@@ -707,7 +711,9 @@ var MenuRender = (function () {
     var rows = [
       { label: labels.table,  value: table.name || ("#" + (table.id || "")) },
       { label: labels.guests, value: table.guests != null ? table.guests : (table.seats || "") },
-      { label: labels.server, value: table.server || "" }
+      { label: labels.server, value: table.server || "" },
+      { label: labels.orderNumber, value: table.orderNumber || "" },
+      { label: labels.orderedAt, value: table.orderedAt ? new Date(table.orderedAt).toLocaleTimeString(labels.locale, { hour: "2-digit", minute: "2-digit" }) : "" }
     ];
     rows.forEach(function (r) {
       if (r.value === "" || r.value == null) return;
@@ -1000,7 +1006,6 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
-    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,
@@ -1662,19 +1667,40 @@ var RestaurantMenu = (function () {
     MenuEvents.reset();
     MenuCore.init(cfg);
 
-    // Apply theme CSS variables
-    $container.empty().addClass("rm-root");
-    $container.toggleClass("rm-root--fancy", !!cfg.complexAnimations);
     var camelToKebab = function (s) {
       return s.replace(/([A-Z])/g, function (m) { return "-" + m.toLowerCase(); });
     };
+
+    // ── Root element: either the container (default) or a modal box ───────
+    var $root;
+    var $menuOverlay = null;
+    var _menuModalOpen = false;
+
+    if (cfg.modal) {
+      $menuOverlay = jQuery("<div>").addClass("rm-menu-overlay");
+      $root = jQuery("<div>").addClass("rm-root rm-root--modal");
+      $root.append(
+        jQuery("<button type='button'>").addClass("rm-menu-modal-close")
+          .attr("aria-label", "Close")
+          .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
+          .on("click", function () { closeMenuModal(); })
+      );
+      $menuOverlay.append($root);
+      jQuery("body").append($menuOverlay);
+      $container.empty();
+    } else {
+      $container.empty().addClass("rm-root");
+      $root = $container;
+    }
+
+    $root.toggleClass("rm-root--fancy", !!cfg.complexAnimations);
     jQuery.each(cfg.theme, function (key, val) {
-      $container[0].style.setProperty("--rm-" + camelToKebab(key), val);
+      $root[0].style.setProperty("--rm-" + camelToKebab(key), val);
     });
 
     // Build DOM
     var $shell = MenuRender.buildShell();
-    $container.append($shell);
+    $root.append($shell);
     MenuBrowse.build($shell);
     MenuBasket.build($shell);
 
@@ -1682,19 +1708,19 @@ var RestaurantMenu = (function () {
     var $fab = MenuRender.buildBasketFab(cfg.labels);
     $shell.append($fab);
 
-    // ── Drawer toggle (push animation on tablet / mobile) ─────
+    // ── Drawer toggle ─────────────────────────────────────────────────────
     var _escHandler = null;
     function openBasket() {
       if ($shell.hasClass("rm-wrapper--basket-open")) return;
       $shell.addClass("rm-wrapper--basket-open");
-      jQuery("body").css("overflow", "hidden");
+      if (!_menuModalOpen) jQuery("body").css("overflow", "hidden");
       _escHandler = function (e) { if (e.key === "Escape") closeBasket(); };
       jQuery(document).on("keydown.rmdrawer", _escHandler);
     }
     function closeBasket() {
       if (!$shell.hasClass("rm-wrapper--basket-open")) return;
       $shell.removeClass("rm-wrapper--basket-open");
-      jQuery("body").css("overflow", "");
+      if (!_menuModalOpen) jQuery("body").css("overflow", "");
       jQuery(document).off("keydown.rmdrawer");
       _escHandler = null;
     }
@@ -1715,12 +1741,35 @@ var RestaurantMenu = (function () {
     _syncFab();
     MenuEvents.on("basket:changed", _syncFab);
 
+    // ── Modal open / close ────────────────────────────────────────────────
+    function openMenuModal() {
+      if (!cfg.modal || _menuModalOpen) return;
+      _menuModalOpen = true;
+      $menuOverlay.addClass("rm-menu-overlay--open");
+      jQuery("body").css("overflow", "hidden");
+      jQuery(document).on("keydown.rmmenumodal", function (e) {
+        if (e.key === "Escape") closeMenuModal();
+      });
+    }
+    function closeMenuModal() {
+      if (!cfg.modal || !_menuModalOpen) return;
+      _menuModalOpen = false;
+      $menuOverlay.removeClass("rm-menu-overlay--open");
+      jQuery("body").css("overflow", "");
+      jQuery(document).off("keydown.rmmenumodal");
+    }
+    if (cfg.modal) {
+      $menuOverlay.on("click", function (e) {
+        if (e.target === $menuOverlay[0]) closeMenuModal();
+      });
+    }
+
     // ── Keep --rm-table-slot-h in sync so .rm-right top/max-height stay correct
     var $slot = $shell.find("." + MenuRender.ns("table-slot"));
     function _syncSlotHeight() {
       var h = $slot.outerHeight() || 0;
       // Include the 16px gap between slot and body.
-      $container[0].style.setProperty("--rm-table-slot-h", (h + 16) + "px");
+      $root[0].style.setProperty("--rm-table-slot-h", (h + 16) + "px");
     }
     _syncSlotHeight();
     var _slotRO = null;
@@ -1772,10 +1821,16 @@ var RestaurantMenu = (function () {
       // Animation toggle at runtime
       setComplexAnimations: function (on) {
         cfg.complexAnimations = !!on;
-        jQuery("#" + cfg.containerId).toggleClass("rm-root--fancy", !!on);
+        $root.toggleClass("rm-root--fancy", !!on);
       },
 
-      // Basket drawer (tablet / mobile push animation)
+      // Menu modal (only when modal: true)
+      openModal:    openMenuModal,
+      closeModal:   closeMenuModal,
+      toggleModal:  function () { if (_menuModalOpen) closeMenuModal(); else openMenuModal(); },
+      isModalOpen:  function () { return _menuModalOpen; },
+
+      // Basket drawer (tablet / mobile)
       openBasket:   openBasket,
       closeBasket:  closeBasket,
       toggleBasket: toggleBasket,
@@ -1820,7 +1875,12 @@ var RestaurantMenu = (function () {
         if (_slotRO) { try { _slotRO.disconnect(); } catch (e) {} }
         jQuery(window).off("resize.rmslot");
         jQuery(document).off("keydown.rmdrawer");
+        jQuery(document).off("keydown.rmmenumodal");
         jQuery("body").css("overflow", "");
+        if ($menuOverlay) {
+          $menuOverlay.remove();
+          $menuOverlay = null;
+        }
         jQuery("#" + cfg.containerId).empty().removeClass("rm-root");
         MenuEvents.reset();
         MenuCore.reset();

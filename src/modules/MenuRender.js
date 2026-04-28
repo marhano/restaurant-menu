@@ -35,7 +35,9 @@ var MenuRender = (function () {
     var rows = [
       { label: labels.table,  value: table.name || ("#" + (table.id || "")) },
       { label: labels.guests, value: table.guests != null ? table.guests : (table.seats || "") },
-      { label: labels.server, value: table.server || "" }
+      { label: labels.server, value: table.server || "" },
+      { label: labels.orderNumber, value: table.orderNumber || "" },
+      { label: labels.orderedAt, value: table.orderedAt ? new Date(table.orderedAt).toLocaleTimeString(labels.locale, { hour: "2-digit", minute: "2-digit" }) : "" }
     ];
     rows.forEach(function (r) {
       if (r.value === "" || r.value == null) return;
@@ -328,7 +330,6 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
-    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,

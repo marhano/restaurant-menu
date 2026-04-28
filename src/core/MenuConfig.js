@@ -30,6 +30,10 @@ var MenuConfig = (function () {
       decimals: 2,
     },
 
+    // When true the menu renders inside a fullscreen modal overlay that starts
+    // hidden. Call menu.openModal() / menu.closeModal() to control it.
+    modal: false,
+
     // When true: subcategories become the top-level tab navigation and items
     // are filtered by subcategoryId only (categoryId is ignored). Useful when
     // all items share a single categoryId (e.g. "SERVICES").

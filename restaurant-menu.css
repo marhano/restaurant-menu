@@ -37,7 +37,6 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   width: 100%;
   min-height: 600px;
 }
@@ -45,8 +44,10 @@
 /* Sticky table info slot — stays pinned to top in both desktop and tablet. */
 .rm-table-slot {
   position: sticky;
-  top: 8px;
+  top: 0px;
   z-index: 40;
+  padding: 1rem 0;
+  background: var(--rm-surface-bright, #fafafa);
 }
 
 /* Body holds the two columns (browse + basket). */
@@ -119,7 +120,7 @@
 
   .rm-basket-fab {
     position: fixed;
-    right: 20px; bottom: 20px;
+    right: 32px; bottom: 32px;
     width: 58px; height: 58px;
     border: none; border-radius: 50%;
     background: var(--rm-primary); color: #fff;
@@ -604,7 +605,75 @@
 }
 .rm-btn-cancel:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
 
-/* ── Modal ────────────────────────────────────────── */
+/* ── Menu modal ───────────────────────────────────── */
+.rm-menu-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(10, 10, 10, 0.52);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.rm-menu-overlay--open { display: flex; }
+
+.rm-root--modal {
+  width: 100%;
+  max-width: 1200px;
+  height: calc(100vh - 40px);
+  background: var(--rm-surface-bright, #fafafa);
+  border-radius: 16px;
+  box-shadow: 0 32px 80px rgba(10, 10, 10, 0.28), 0 0 0 1px rgba(10, 10, 10, 0.06);
+  overflow-y: auto;
+  padding: 0 1rem 1rem 1rem;
+}
+
+/* On desktop inside the modal: lock to 2-column, hide the drawer controls. */
+@media (min-width: 1025px) {
+  .rm-root--modal .rm-body {
+    grid-template-columns: minmax(0, 1fr) 380px !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+  }
+  .rm-root--modal .rm-right {
+    position: sticky !important;
+    top: calc(-16px + var(--rm-table-slot-h, 96px)) !important;
+    height: auto !important;
+    max-height: calc(100vh - 40px - var(--rm-table-slot-h, 96px)) !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .rm-root--modal .rm-basket {
+    border-radius: 12px;
+    border: 1px solid var(--rm-border, #ededed);
+    min-height: 480px;
+    flex: unset;
+  }
+  .rm-root--modal .rm-backdrop,
+  .rm-root--modal .rm-basket-fab,
+  .rm-root--modal .rm-basket-close { display: none !important; }
+}
+/* On small screens inside the modal: normal drawer behaviour applies. */
+
+.rm-menu-modal-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 36px; height: 36px;
+  border: none; border-radius: 8px;
+  background: rgba(10, 10, 10, 0.06);
+  color: #737373;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  z-index: 10;
+  transition: background 0.15s, color 0.15s;
+}
+.rm-menu-modal-close:hover { background: rgba(10, 10, 10, 0.12); color: #0a0a0a; }
+
+/* ── Modal (item edit) ────────────────────────────── */
 .rm-overlay {
   position: fixed; inset: 0; z-index: 1100;
   background: rgba(10, 10, 10, 0.42);
