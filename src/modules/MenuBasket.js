@@ -75,6 +75,16 @@ var MenuBasket = (function () {
     var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
     if (count) $h.append(jQuery("<span>").addClass(ns("basket-count")).text(count));
 
+    var sectionCount = MenuCore.getBasketBySection(MenuCore.getActiveSectionId()).reduce(function (s, l) { return s + l.qty; }, 0);
+    if (sectionCount) {
+      $h.append(
+        jQuery("<button type='button'>").addClass(ns("basket-clear-section"))
+          .attr("title", "Remove all from this section")
+          .append(jQuery("<i>").addClass("fa-solid fa-trash-can"))
+          .append(jQuery("<span>").text("Remove all"))
+      );
+    }
+
     // Close button (CSS hides on desktop, shows on tablet drawer)
     $h.append(
       jQuery("<button type='button'>").addClass(ns("basket-close"))
@@ -239,6 +249,10 @@ var MenuBasket = (function () {
 
     _$root.on("click", "." + ns("basket-tab"), function () {
       MenuCore.setActiveSection(jQuery(this).attr("data-section-id"));
+    });
+
+    _$root.on("click", "." + ns("basket-clear-section"), function () {
+      MenuCore.clearSection(MenuCore.getActiveSectionId());
     });
 
     _$root.on("click", "." + ns("existing-order-toggle"), function () {

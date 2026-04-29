@@ -348,6 +348,14 @@ var MenuCore = (function () {
     MenuEvents.emit("basket:changed", { line: l, reason: "section" });
   }
 
+  function clearSection(sectionId) {
+    var before = _basket.length;
+    _basket = _basket.filter(function (l) { return l.sectionId !== sectionId; });
+    if (_basket.length !== before) {
+      MenuEvents.emit("basket:changed", { reason: "clear" });
+    }
+  }
+
   function clearBasket() {
     _basket = [];
     _lineSeq = 1;
@@ -476,6 +484,7 @@ var MenuCore = (function () {
     removeLine: removeLine,
     setLineNote: setLineNote,
     moveLineToSection: moveLineToSection,
+    clearSection: clearSection,
     clearBasket: clearBasket,
 
     // Table & serving

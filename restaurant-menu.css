@@ -475,6 +475,20 @@
   background: var(--rm-primary); color: #fff;
   padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
 }
+.rm-basket-clear-section {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid var(--rm-border-strong); background: transparent;
+  border-radius: 7px; cursor: pointer;
+  font: inherit; font-size: 0.72rem; font-weight: 500;
+  color: var(--rm-surface-muted);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.rm-basket-clear-section:hover {
+  background: #fef2f2; border-color: var(--rm-danger);
+  color: var(--rm-danger);
+}
 
 .rm-basket-tabs {
   display: flex; gap: 4px; padding: 8px 10px;
