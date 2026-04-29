@@ -234,6 +234,7 @@ var MenuRender = (function () {
       jQuery("<div>").addClass(ns("basket-header")),
       jQuery("<div>").addClass(ns("basket-tabs")),
       jQuery("<div>").addClass(ns("existing-order")),
+      jQuery("<div>").addClass(ns("servings-list")),
       jQuery("<div>").addClass(ns("basket-list")),
       jQuery("<div>").addClass(ns("basket-footer"))
     );
@@ -312,7 +313,7 @@ var MenuRender = (function () {
     );
   }
 
-  function buildBasketFooter(cfg, servingLabel, totalText) {
+  function buildBasketFooter(cfg, servingLabel, totalText, hideNextServing) {
     var $f = jQuery("<div>").addClass(ns("basket-footer-inner"));
     $f.append(
       jQuery("<div>").addClass(ns("basket-serving")).text(servingLabel)
@@ -325,7 +326,7 @@ var MenuRender = (function () {
       );
     }
     var $btns = jQuery("<div>").addClass(ns("basket-btns"));
-    if (cfg.showNextServingButton) {
+    if (cfg.showNextServingButton && !hideNextServing) {
       $btns.append(
         jQuery("<button>").addClass(ns("btn") + " " + ns("btn-secondary") + " " + ns("btn-next-serving"))
           .append(jQuery("<i>").addClass("fa-solid fa-forward"))

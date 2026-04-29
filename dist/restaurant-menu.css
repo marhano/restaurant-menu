@@ -644,6 +644,108 @@
   font-size: 0.8rem; font-weight: 600; color: var(--rm-surface-muted);
 }
 
+/* ── Serving accordions ───────────────────────────── */
+.rm-servings-list { display: flex; flex-direction: column; flex-shrink: 0; }
+
+.rm-serving-acc { border-bottom: 1px solid var(--rm-border); }
+
+.rm-serving-acc-header {
+  display: flex; align-items: center;
+  padding-right: 10px;
+}
+
+.rm-serving-acc-toggle {
+  display: flex; align-items: center; gap: 7px;
+  flex: 1; padding: 9px 12px;
+  border: none; background: transparent; cursor: pointer;
+  font: inherit; text-align: left; color: var(--rm-surface-alt);
+  transition: background 0.15s;
+}
+.rm-serving-acc-toggle:hover { background: var(--rm-primary-soft); }
+
+.rm-serving-acc-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 5px;
+  background: var(--rm-primary); color: #fff;
+  border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+  flex-shrink: 0;
+}
+
+.rm-serving-acc-label {
+  font-size: 0.82rem; font-weight: 600; flex: 1;
+}
+
+.rm-serving-acc-count {
+  font-size: 0.7rem; color: var(--rm-surface-muted);
+}
+
+.rm-serving-acc-total {
+  font-size: 0.78rem; font-weight: 600; color: var(--rm-primary);
+}
+
+.rm-serving-acc-chevron {
+  font-size: 0.68rem; color: var(--rm-surface-subtle);
+  transition: transform 0.2s ease;
+}
+.rm-serving-acc--open .rm-serving-acc-chevron { transform: rotate(180deg); }
+
+.rm-serving-acc-body {
+  display: none;
+  max-height: 220px; overflow-y: auto;
+  border-top: 1px solid var(--rm-border);
+  background: var(--rm-surface-bright);
+}
+.rm-serving-acc--open .rm-serving-acc-body { display: block; }
+
+.rm-serving-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: none; background: transparent; border-radius: 6px;
+  cursor: pointer; font-size: 0.75rem;
+  color: var(--rm-surface-subtle);
+  transition: background 0.15s, color 0.15s;
+}
+.rm-serving-remove:hover { background: #fef2f2; color: var(--rm-danger); }
+
+/* Serving qty buttons reuse rm-qty-ctrl container but need their own hover rules */
+.rm-serving-qty-dec, .rm-serving-qty-inc {
+  width: 22px; height: 22px; border: none; background: transparent;
+  border-radius: 5px; cursor: pointer; color: var(--rm-surface-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.rm-serving-qty-inc:hover { background: var(--rm-surface-alt); color: #fff; }
+.rm-serving-qty-dec:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
+
+/* Serving lines */
+.rm-serving-line {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 6px; align-items: center;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--rm-border);
+}
+.rm-serving-line:last-child { border-bottom: none; }
+
+.rm-serving-line-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rm-serving-line-name { font-size: 0.83rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-serving-line-price { font-size: 0.72rem; color: var(--rm-surface-muted); }
+.rm-serving-line-qty { font-size: 0.78rem; color: var(--rm-surface-muted); white-space: nowrap; }
+.rm-serving-line-total { font-size: 0.82rem; font-weight: 600; white-space: nowrap; text-align: right; }
+
+.rm-serving-line-actions {
+  display: flex; gap: 2px;
+}
+.rm-serving-line-actions button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border: none; background: transparent; border-radius: 5px;
+  cursor: pointer; font-size: 0.72rem; color: var(--rm-surface-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.rm-serving-line-actions .rm-serving-line-remove:hover { background: #fef2f2; color: var(--rm-danger); }
+.rm-serving-line-actions .rm-serving-line-edit:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
+
 /* ── Basket footer ────────────────────────────────── */
 .rm-basket-footer { border-top: 1px solid var(--rm-border); flex-shrink: 0; }
 .rm-basket-footer-inner {

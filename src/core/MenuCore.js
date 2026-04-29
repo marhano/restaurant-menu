@@ -11,14 +11,23 @@ var MenuCore = (function () {
   var _search = "";
   var _filters = { minPrice: null, maxPrice: null, sort: "default" };
   var _table = null;
-  var _serving = 1;
+  // Per-section serving counters: { sectionId: currentServingNumber }
+  var _sectionServings = {};
 
-  // Basket lines: { lineId, item, qty, note, sectionId }
+  // Basket lines: { lineId, item, qty, note, sectionId, serving }
   var _basket = [];
   var _existingOrder = [];
   var _lineSeq = 1;
 
   // ── Setup ─────────────────────────────────────────
+
+  function _initSectionServings(sections) {
+    var next = {};
+    (sections || []).forEach(function (s) {
+      next[s.id] = _sectionServings[s.id] || 1;
+    });
+    _sectionServings = next;
+  }
 
   function init(cfg) {
     _cfg = cfg;
@@ -26,7 +35,8 @@ var MenuCore = (function () {
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    _sectionServings = {};
+    (cfg.basketSections || []).forEach(function (s) { _sectionServings[s.id] = 1; });
     _search = "";
     _filters = jQuery.extend(true, { minPrice: null, maxPrice: null, sort: "default" }, cfg.filters || {});
     _activeCategoryId = (cfg.categories && cfg.categories[0]) ? cfg.categories[0].id : null;
@@ -39,7 +49,7 @@ var MenuCore = (function () {
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    _sectionServings = {};
     _search = "";
     _filters = { minPrice: null, maxPrice: null, sort: "default" };
     _activeCategoryId = null;
@@ -79,6 +89,8 @@ var MenuCore = (function () {
     // Reconcile active section
     var ok = _cfg.basketSections.some(function (s) { return s.id === _activeSectionId; });
     if (!ok) _activeSectionId = _cfg.basketSections[0].id;
+    // Preserve serving counters for existing sections, add new ones at 1
+    _initSectionServings(_cfg.basketSections);
     // Move any basket lines in removed sections to the default
     var valid = {};
     _cfg.basketSections.forEach(function (s) { valid[s.id] = true; });
@@ -93,18 +105,17 @@ var MenuCore = (function () {
    * Start a new order for the given table:
    *   - swap table
    *   - clear basket
-   *   - reset serving to 1
+   *   - reset all section servings to 1
    */
   function startNewOrder(table) {
     _table = table ? jQuery.extend(true, {}, table) : null;
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    Object.keys(_sectionServings).forEach(function (k) { _sectionServings[k] = 1; });
     MenuEvents.emit("table:changed", _table);
     MenuEvents.emit("basket:changed", { reason: "clear" });
     MenuEvents.emit("existingOrder:changed");
-    MenuEvents.emit("serving:changed", _serving);
   }
 
   // ── Menu queries ──────────────────────────────────
@@ -270,7 +281,34 @@ var MenuCore = (function () {
   function getBasket() { return _basket.slice(); }
 
   function getBasketBySection(sectionId) {
-    return _basket.filter(function (l) { return l.sectionId === sectionId; });
+    var cur = _sectionServings[sectionId] || 1;
+    return _basket.filter(function (l) { return l.sectionId === sectionId && l.serving === cur; });
+  }
+
+  function getCurrentBasket() {
+    return _basket.filter(function (l) {
+      var cur = _sectionServings[l.sectionId] || 1;
+      return l.serving === cur;
+    });
+  }
+
+  /**
+   * Returns past (completed) servings for a section, sorted ascending.
+   * sectionId defaults to the active section when omitted.
+   */
+  function getServings(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    var cur = _sectionServings[sid] || 1;
+    var groups = {};
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving < cur) {
+        if (!groups[l.serving]) groups[l.serving] = [];
+        groups[l.serving].push(l);
+      }
+    });
+    return Object.keys(groups).map(Number).sort(function (a, b) { return a - b; }).map(function (n) {
+      return { serving: n, lines: groups[n] };
+    });
   }
 
   function getBasketTotal() {
@@ -287,8 +325,9 @@ var MenuCore = (function () {
   }
 
   function _findLine(itemId, sectionId) {
+    var cur = _sectionServings[sectionId] || 1;
     return _basket.find(function (l) {
-      return l.item.id === itemId && l.sectionId === sectionId && !l.note;
+      return l.item.id === itemId && l.sectionId === sectionId && l.serving === cur && !l.note;
     }) || null;
   }
 
@@ -297,7 +336,7 @@ var MenuCore = (function () {
     if (!item) return null;
     var sectionId = resolveSection(item, overrideSectionId);
 
-    // Stack if an un-noted line for same item+section exists
+    // Stack if an un-noted line for same item+section+serving exists
     var existing = _findLine(itemId, sectionId);
     if (existing) {
       existing.qty += 1;
@@ -310,7 +349,8 @@ var MenuCore = (function () {
       item: jQuery.extend(true, {}, item),
       qty: 1,
       note: "",
-      sectionId: sectionId
+      sectionId: sectionId,
+      serving: _sectionServings[sectionId] || 1
     };
     _basket.push(line);
     MenuEvents.emit("basket:changed", { line: line, reason: "add" });
@@ -359,23 +399,45 @@ var MenuCore = (function () {
   }
 
   function clearSection(sectionId) {
+    var cur = _sectionServings[sectionId] || 1;
     var before = _basket.length;
-    _basket = _basket.filter(function (l) { return l.sectionId !== sectionId; });
+    _basket = _basket.filter(function (l) {
+      return !(l.sectionId === sectionId && l.serving === cur);
+    });
     if (_basket.length !== before) {
       MenuEvents.emit("basket:changed", { reason: "clear" });
     }
   }
 
+  /**
+   * Remove a completed serving for a section and renumber remaining ones.
+   * If serving 1 of 3 is removed: [1,2,3] → [1,2] (former 2→1, former 3→2).
+   */
+  function removeServing(n, sectionId) {
+    var sid = sectionId || _activeSectionId;
+    _basket = _basket.filter(function (l) { return !(l.sectionId === sid && l.serving === n); });
+    // Shift higher serving numbers down by 1 for this section
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving > n) l.serving -= 1;
+    });
+    // Adjust the current serving counter
+    if ((_sectionServings[sid] || 1) > n) {
+      _sectionServings[sid] = (_sectionServings[sid] || 1) - 1;
+    }
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
   function clearBasket() {
     _basket = [];
     _lineSeq = 1;
+    Object.keys(_sectionServings).forEach(function (k) { _sectionServings[k] = 1; });
     MenuEvents.emit("basket:changed", { reason: "clear" });
   }
 
   /**
-   * Bulk-load lines into the basket, replacing whatever was there.
-   * Each entry: { itemId, qty, note, sectionId }
-   * Unknown itemIds are silently skipped.
+   * Bulk-load lines into the existing-order slot.
+   * Each entry: { ProductId, Quantity, Note }
+   * Unknown ProductIds are silently skipped.
    */
   function setBasket(lines) {
     _existingOrder = [];
@@ -422,15 +484,30 @@ var MenuCore = (function () {
     MenuEvents.emit("table:changed", _table);
   }
 
-  function getServing() { return _serving; }
-  function setServing(n) {
-    _serving = Math.max(1, parseInt(n, 10) || 1);
-    MenuEvents.emit("serving:changed", _serving);
+  /** Returns the current serving number for a section (defaults to active section). */
+  function getServing(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    return _sectionServings[sid] || 1;
   }
-  function nextServing() {
-    _serving += 1;
-    MenuEvents.emit("serving:changed", _serving);
-    return _serving;
+
+  function setServing(n, sectionId) {
+    var sid = sectionId || _activeSectionId;
+    _sectionServings[sid] = Math.max(1, parseInt(n, 10) || 1);
+    MenuEvents.emit("serving:changed", _sectionServings[sid]);
+  }
+
+  /**
+   * Seals the current serving for a section and starts the next one.
+   * sectionId defaults to the active section.
+   * No-ops if the current serving for that section is empty.
+   */
+  function nextServing(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    if (!getBasketBySection(sid).length) return _sectionServings[sid] || 1;
+    _sectionServings[sid] = (_sectionServings[sid] || 1) + 1;
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("serving:changed", _sectionServings[sid]);
+    return _sectionServings[sid];
   }
 
   // ── Formatting helper ─────────────────────────────
@@ -484,9 +561,11 @@ var MenuCore = (function () {
     getExistingOrder: getExistingOrder,
     clearExistingOrder: clearExistingOrder,
     getBasket: getBasket,
+    getCurrentBasket: getCurrentBasket,
     getBasketBySection: getBasketBySection,
     getBasketTotal: getBasketTotal,
     getSectionTotal: getSectionTotal,
+    getServings: getServings,
     addItem: addItem,
     setBasket: setBasket,
     incQty: incQty,
@@ -495,6 +574,7 @@ var MenuCore = (function () {
     setLineNote: setLineNote,
     moveLineToSection: moveLineToSection,
     clearSection: clearSection,
+    removeServing: removeServing,
     clearBasket: clearBasket,
 
     // Table & serving

@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-29T04:10:16.598Z
+ * Built: 2026-04-29T07:45:58.246Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -244,14 +244,23 @@ var MenuCore = (function () {
   var _search = "";
   var _filters = { minPrice: null, maxPrice: null, sort: "default" };
   var _table = null;
-  var _serving = 1;
+  // Per-section serving counters: { sectionId: currentServingNumber }
+  var _sectionServings = {};
 
-  // Basket lines: { lineId, item, qty, note, sectionId }
+  // Basket lines: { lineId, item, qty, note, sectionId, serving }
   var _basket = [];
   var _existingOrder = [];
   var _lineSeq = 1;
 
   // ── Setup ─────────────────────────────────────────
+
+  function _initSectionServings(sections) {
+    var next = {};
+    (sections || []).forEach(function (s) {
+      next[s.id] = _sectionServings[s.id] || 1;
+    });
+    _sectionServings = next;
+  }
 
   function init(cfg) {
     _cfg = cfg;
@@ -259,7 +268,8 @@ var MenuCore = (function () {
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    _sectionServings = {};
+    (cfg.basketSections || []).forEach(function (s) { _sectionServings[s.id] = 1; });
     _search = "";
     _filters = jQuery.extend(true, { minPrice: null, maxPrice: null, sort: "default" }, cfg.filters || {});
     _activeCategoryId = (cfg.categories && cfg.categories[0]) ? cfg.categories[0].id : null;
@@ -272,7 +282,7 @@ var MenuCore = (function () {
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    _sectionServings = {};
     _search = "";
     _filters = { minPrice: null, maxPrice: null, sort: "default" };
     _activeCategoryId = null;
@@ -312,6 +322,8 @@ var MenuCore = (function () {
     // Reconcile active section
     var ok = _cfg.basketSections.some(function (s) { return s.id === _activeSectionId; });
     if (!ok) _activeSectionId = _cfg.basketSections[0].id;
+    // Preserve serving counters for existing sections, add new ones at 1
+    _initSectionServings(_cfg.basketSections);
     // Move any basket lines in removed sections to the default
     var valid = {};
     _cfg.basketSections.forEach(function (s) { valid[s.id] = true; });
@@ -326,18 +338,17 @@ var MenuCore = (function () {
    * Start a new order for the given table:
    *   - swap table
    *   - clear basket
-   *   - reset serving to 1
+   *   - reset all section servings to 1
    */
   function startNewOrder(table) {
     _table = table ? jQuery.extend(true, {}, table) : null;
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
-    _serving = 1;
+    Object.keys(_sectionServings).forEach(function (k) { _sectionServings[k] = 1; });
     MenuEvents.emit("table:changed", _table);
     MenuEvents.emit("basket:changed", { reason: "clear" });
     MenuEvents.emit("existingOrder:changed");
-    MenuEvents.emit("serving:changed", _serving);
   }
 
   // ── Menu queries ──────────────────────────────────
@@ -503,7 +514,34 @@ var MenuCore = (function () {
   function getBasket() { return _basket.slice(); }
 
   function getBasketBySection(sectionId) {
-    return _basket.filter(function (l) { return l.sectionId === sectionId; });
+    var cur = _sectionServings[sectionId] || 1;
+    return _basket.filter(function (l) { return l.sectionId === sectionId && l.serving === cur; });
+  }
+
+  function getCurrentBasket() {
+    return _basket.filter(function (l) {
+      var cur = _sectionServings[l.sectionId] || 1;
+      return l.serving === cur;
+    });
+  }
+
+  /**
+   * Returns past (completed) servings for a section, sorted ascending.
+   * sectionId defaults to the active section when omitted.
+   */
+  function getServings(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    var cur = _sectionServings[sid] || 1;
+    var groups = {};
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving < cur) {
+        if (!groups[l.serving]) groups[l.serving] = [];
+        groups[l.serving].push(l);
+      }
+    });
+    return Object.keys(groups).map(Number).sort(function (a, b) { return a - b; }).map(function (n) {
+      return { serving: n, lines: groups[n] };
+    });
   }
 
   function getBasketTotal() {
@@ -520,8 +558,9 @@ var MenuCore = (function () {
   }
 
   function _findLine(itemId, sectionId) {
+    var cur = _sectionServings[sectionId] || 1;
     return _basket.find(function (l) {
-      return l.item.id === itemId && l.sectionId === sectionId && !l.note;
+      return l.item.id === itemId && l.sectionId === sectionId && l.serving === cur && !l.note;
     }) || null;
   }
 
@@ -530,7 +569,7 @@ var MenuCore = (function () {
     if (!item) return null;
     var sectionId = resolveSection(item, overrideSectionId);
 
-    // Stack if an un-noted line for same item+section exists
+    // Stack if an un-noted line for same item+section+serving exists
     var existing = _findLine(itemId, sectionId);
     if (existing) {
       existing.qty += 1;
@@ -543,7 +582,8 @@ var MenuCore = (function () {
       item: jQuery.extend(true, {}, item),
       qty: 1,
       note: "",
-      sectionId: sectionId
+      sectionId: sectionId,
+      serving: _sectionServings[sectionId] || 1
     };
     _basket.push(line);
     MenuEvents.emit("basket:changed", { line: line, reason: "add" });
@@ -592,23 +632,45 @@ var MenuCore = (function () {
   }
 
   function clearSection(sectionId) {
+    var cur = _sectionServings[sectionId] || 1;
     var before = _basket.length;
-    _basket = _basket.filter(function (l) { return l.sectionId !== sectionId; });
+    _basket = _basket.filter(function (l) {
+      return !(l.sectionId === sectionId && l.serving === cur);
+    });
     if (_basket.length !== before) {
       MenuEvents.emit("basket:changed", { reason: "clear" });
     }
   }
 
+  /**
+   * Remove a completed serving for a section and renumber remaining ones.
+   * If serving 1 of 3 is removed: [1,2,3] → [1,2] (former 2→1, former 3→2).
+   */
+  function removeServing(n, sectionId) {
+    var sid = sectionId || _activeSectionId;
+    _basket = _basket.filter(function (l) { return !(l.sectionId === sid && l.serving === n); });
+    // Shift higher serving numbers down by 1 for this section
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving > n) l.serving -= 1;
+    });
+    // Adjust the current serving counter
+    if ((_sectionServings[sid] || 1) > n) {
+      _sectionServings[sid] = (_sectionServings[sid] || 1) - 1;
+    }
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
   function clearBasket() {
     _basket = [];
     _lineSeq = 1;
+    Object.keys(_sectionServings).forEach(function (k) { _sectionServings[k] = 1; });
     MenuEvents.emit("basket:changed", { reason: "clear" });
   }
 
   /**
-   * Bulk-load lines into the basket, replacing whatever was there.
-   * Each entry: { itemId, qty, note, sectionId }
-   * Unknown itemIds are silently skipped.
+   * Bulk-load lines into the existing-order slot.
+   * Each entry: { ProductId, Quantity, Note }
+   * Unknown ProductIds are silently skipped.
    */
   function setBasket(lines) {
     _existingOrder = [];
@@ -655,15 +717,30 @@ var MenuCore = (function () {
     MenuEvents.emit("table:changed", _table);
   }
 
-  function getServing() { return _serving; }
-  function setServing(n) {
-    _serving = Math.max(1, parseInt(n, 10) || 1);
-    MenuEvents.emit("serving:changed", _serving);
+  /** Returns the current serving number for a section (defaults to active section). */
+  function getServing(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    return _sectionServings[sid] || 1;
   }
-  function nextServing() {
-    _serving += 1;
-    MenuEvents.emit("serving:changed", _serving);
-    return _serving;
+
+  function setServing(n, sectionId) {
+    var sid = sectionId || _activeSectionId;
+    _sectionServings[sid] = Math.max(1, parseInt(n, 10) || 1);
+    MenuEvents.emit("serving:changed", _sectionServings[sid]);
+  }
+
+  /**
+   * Seals the current serving for a section and starts the next one.
+   * sectionId defaults to the active section.
+   * No-ops if the current serving for that section is empty.
+   */
+  function nextServing(sectionId) {
+    var sid = sectionId || _activeSectionId;
+    if (!getBasketBySection(sid).length) return _sectionServings[sid] || 1;
+    _sectionServings[sid] = (_sectionServings[sid] || 1) + 1;
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("serving:changed", _sectionServings[sid]);
+    return _sectionServings[sid];
   }
 
   // ── Formatting helper ─────────────────────────────
@@ -717,9 +794,11 @@ var MenuCore = (function () {
     getExistingOrder: getExistingOrder,
     clearExistingOrder: clearExistingOrder,
     getBasket: getBasket,
+    getCurrentBasket: getCurrentBasket,
     getBasketBySection: getBasketBySection,
     getBasketTotal: getBasketTotal,
     getSectionTotal: getSectionTotal,
+    getServings: getServings,
     addItem: addItem,
     setBasket: setBasket,
     incQty: incQty,
@@ -728,6 +807,7 @@ var MenuCore = (function () {
     setLineNote: setLineNote,
     moveLineToSection: moveLineToSection,
     clearSection: clearSection,
+    removeServing: removeServing,
     clearBasket: clearBasket,
 
     // Table & serving
@@ -979,6 +1059,7 @@ var MenuRender = (function () {
       jQuery("<div>").addClass(ns("basket-header")),
       jQuery("<div>").addClass(ns("basket-tabs")),
       jQuery("<div>").addClass(ns("existing-order")),
+      jQuery("<div>").addClass(ns("servings-list")),
       jQuery("<div>").addClass(ns("basket-list")),
       jQuery("<div>").addClass(ns("basket-footer"))
     );
@@ -1057,7 +1138,7 @@ var MenuRender = (function () {
     );
   }
 
-  function buildBasketFooter(cfg, servingLabel, totalText) {
+  function buildBasketFooter(cfg, servingLabel, totalText, hideNextServing) {
     var $f = jQuery("<div>").addClass(ns("basket-footer-inner"));
     $f.append(
       jQuery("<div>").addClass(ns("basket-serving")).text(servingLabel)
@@ -1070,7 +1151,7 @@ var MenuRender = (function () {
       );
     }
     var $btns = jQuery("<div>").addClass(ns("basket-btns"));
-    if (cfg.showNextServingButton) {
+    if (cfg.showNextServingButton && !hideNextServing) {
       $btns.append(
         jQuery("<button>").addClass(ns("btn") + " " + ns("btn-secondary") + " " + ns("btn-next-serving"))
           .append(jQuery("<i>").addClass("fa-solid fa-forward"))
@@ -1497,19 +1578,24 @@ var MenuBasket = (function () {
       _renderHeader();
       _renderTabs();
       _renderFooter();
+      _renderServings();
       _patchList(evt);
     });
     MenuEvents.on("section:changed", _renderAll);
     MenuEvents.on("sections:changed", _renderAll);
     MenuEvents.on("serving:changed", _renderFooter);
-    MenuEvents.on("existingOrder:changed", _renderExistingOrder);
+    MenuEvents.on("existingOrder:changed", function () {
+      _renderExistingOrder();
+      _renderFooter(); // next-serving button visibility depends on existingOrder
+    });
   }
 
   function _renderAll() {
     _renderHeader();
     _renderTabs();
-    _renderList();
     _renderExistingOrder();
+    _renderServings();
+    _renderList();
     _renderFooter();
   }
 
@@ -1552,7 +1638,7 @@ var MenuBasket = (function () {
     var $h = _$root.find("." + ns("basket-header")).empty();
     $h.append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"));
     $h.append(jQuery("<span>").addClass(ns("basket-title")).text("Order"));
-    var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
+    var count = MenuCore.getCurrentBasket().reduce(function (s, l) { return s + l.qty; }, 0);
     if (count) $h.append(jQuery("<span>").addClass(ns("basket-count")).text(count));
 
     var sectionCount = MenuCore.getBasketBySection(MenuCore.getActiveSectionId()).reduce(function (s, l) { return s + l.qty; }, 0);
@@ -1600,6 +1686,94 @@ var MenuBasket = (function () {
     });
   }
 
+  function _renderServings() {
+    var ns = MenuRender.ns;
+    var cfg = MenuCore.getConfig();
+    var activeSectionId = MenuCore.getActiveSectionId();
+    var servings = MenuCore.getServings(activeSectionId);
+    var $slot = _$root.find("." + ns("servings-list"));
+
+    // Preserve which accordions are open before re-rendering
+    var openSet = {};
+    $slot.find("." + ns("serving-acc--open")).each(function () {
+      openSet[jQuery(this).attr("data-serving")] = true;
+    });
+
+    $slot.empty();
+    if (!servings.length) return;
+
+    servings.forEach(function (sg) {
+      var count = sg.lines.reduce(function (s, l) { return s + l.qty; }, 0);
+      var rawTotal = sg.lines.reduce(function (s, l) { return s + (Number(l.item.price) || 0) * l.qty; }, 0);
+
+      var $acc = jQuery("<div>").addClass(ns("serving-acc")).attr("data-serving", sg.serving);
+      if (openSet[String(sg.serving)]) $acc.addClass(ns("serving-acc--open"));
+
+      // Toggle button
+      var $toggle = jQuery("<button type='button'>").addClass(ns("serving-acc-toggle"));
+      $toggle.append(jQuery("<span>").addClass(ns("serving-acc-num")).text(sg.serving));
+      $toggle.append(jQuery("<span>").addClass(ns("serving-acc-label")).text("Serving " + sg.serving));
+      $toggle.append(jQuery("<span>").addClass(ns("serving-acc-count")).text(count + " item" + (count !== 1 ? "s" : "")));
+      if (cfg.showTotals !== false) {
+        $toggle.append(jQuery("<span>").addClass(ns("serving-acc-total")).text(MenuCore.formatPrice(rawTotal)));
+      }
+      $toggle.append(jQuery("<i>").addClass("fa-solid fa-chevron-down " + ns("serving-acc-chevron")));
+
+      // Remove serving button — data-section-id lets the handler know which section
+      var $removeBtn = jQuery("<button type='button'>").addClass(ns("serving-remove"))
+        .attr("title", "Remove serving")
+        .attr("data-serving", sg.serving)
+        .attr("data-section-id", activeSectionId)
+        .append(jQuery("<i>").addClass("fa-solid fa-trash-can"));
+
+      $acc.append(jQuery("<div>").addClass(ns("serving-acc-header")).append($toggle, $removeBtn));
+
+      // Body — ALL servings are fully editable
+      var $body = jQuery("<div>").addClass(ns("serving-acc-body"));
+      sg.lines.forEach(function (l) {
+        var price = MenuCore.formatPrice(l.item.price);
+        var lineTotal = MenuCore.formatPrice((Number(l.item.price) || 0) * l.qty);
+        var $row = jQuery("<div>").addClass(ns("serving-line")).attr("data-line-id", l.lineId);
+
+        var $main = jQuery("<div>").addClass(ns("serving-line-main"));
+        $main.append(jQuery("<div>").addClass(ns("serving-line-name")).text(l.item.name || ""));
+        $main.append(jQuery("<div>").addClass(ns("serving-line-price")).text(price));
+        if (l.note) {
+          $main.append(
+            jQuery("<div>").addClass(ns("basket-line-note"))
+              .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
+              .append(jQuery("<span>").text(l.note))
+          );
+        }
+        $row.append($main);
+
+        var $qty = jQuery("<div>").addClass(ns("qty-ctrl"));
+        $qty.append(jQuery("<button>").addClass(ns("serving-qty-dec")).append(jQuery("<i>").addClass("fa-solid fa-minus")));
+        $qty.append(jQuery("<span>").addClass(ns("qty-val")).text(l.qty));
+        $qty.append(jQuery("<button>").addClass(ns("serving-qty-inc")).append(jQuery("<i>").addClass("fa-solid fa-plus")));
+        $row.append($qty);
+
+        $row.append(jQuery("<div>").addClass(ns("serving-line-total")).text(lineTotal));
+
+        var $actions = jQuery("<div>").addClass(ns("serving-line-actions"));
+        $actions.append(
+          jQuery("<button>").addClass(ns("serving-line-edit")).attr("title", cfg.labels.edit || "Edit")
+            .append(jQuery("<i>").addClass("fa-solid fa-pen"))
+        );
+        $actions.append(
+          jQuery("<button>").addClass(ns("serving-line-remove")).attr("title", cfg.labels.remove || "Remove")
+            .append(jQuery("<i>").addClass("fa-solid fa-trash-can"))
+        );
+        $row.append($actions);
+
+        $body.append($row);
+      });
+
+      $acc.append($body);
+      $slot.append($acc);
+    });
+  }
+
   /**
    * Targeted DOM update for basket:changed — only the affected line animates.
    *   add    → slide in
@@ -1626,6 +1800,9 @@ var MenuBasket = (function () {
       _renderList();
       return;
     }
+
+    // Line belongs to a past serving for its section — _renderServings() already handled it.
+    if (line.serving !== undefined && line.serving !== MenuCore.getServing(line.sectionId)) return;
 
     // Line belongs to a different section than the one currently shown
     if (line.sectionId !== active) return;
@@ -1718,9 +1895,12 @@ var MenuBasket = (function () {
 
   function _renderFooter() {
     var cfg = MenuCore.getConfig();
+    var hasExistingOrder = MenuCore.getExistingOrder().length > 0;
     var $f = _$root.find("." + MenuRender.ns("basket-footer")).empty();
-    var servingLabel = "Serving #" + MenuCore.getServing();
-    $f.append(MenuRender.buildBasketFooter(cfg, servingLabel, MenuCore.formatPrice(MenuCore.getBasketTotal())));
+    var activeSectionId = MenuCore.getActiveSectionId();
+    var servingLabel = "Serving #" + MenuCore.getServing(activeSectionId);
+    var sectionTotal = MenuCore.getSectionTotal(activeSectionId);
+    $f.append(MenuRender.buildBasketFooter(cfg, servingLabel, MenuCore.formatPrice(sectionTotal), hasExistingOrder));
   }
 
   function _bind() {
@@ -1739,6 +1919,39 @@ var MenuBasket = (function () {
       _$root.find("." + ns("existing-order")).toggleClass(ns("existing-order--open"));
     });
 
+    // Serving accordion toggle
+    _$root.on("click", "." + ns("serving-acc-toggle"), function () {
+      jQuery(this).closest("." + ns("serving-acc")).toggleClass(ns("serving-acc--open"));
+    });
+
+    // Remove entire serving (section id is stored on the button)
+    _$root.on("click", "." + ns("serving-remove"), function (e) {
+      e.stopPropagation();
+      var n = parseInt(jQuery(this).attr("data-serving"), 10);
+      var sid = jQuery(this).attr("data-section-id") || MenuCore.getActiveSectionId();
+      MenuCore.removeServing(n, sid);
+    });
+
+    // Serving line qty / edit / remove (last serving only, controls only rendered there)
+    _$root.on("click", "." + ns("serving-qty-inc"), function () {
+      var id = jQuery(this).closest("." + ns("serving-line")).attr("data-line-id");
+      MenuCore.incQty(id);
+    });
+    _$root.on("click", "." + ns("serving-qty-dec"), function () {
+      var id = jQuery(this).closest("." + ns("serving-line")).attr("data-line-id");
+      MenuCore.decQty(id);
+    });
+    _$root.on("click", "." + ns("serving-line-remove"), function () {
+      var id = jQuery(this).closest("." + ns("serving-line")).attr("data-line-id");
+      MenuCore.removeLine(id);
+    });
+    _$root.on("click", "." + ns("serving-line-edit"), function () {
+      var id = jQuery(this).closest("." + ns("serving-line")).attr("data-line-id");
+      var line = MenuCore.getBasket().find(function (x) { return x.lineId === id; });
+      if (line) MenuEditLine.open(line);
+    });
+
+    // Current serving basket controls
     _$root.on("click", "." + ns("qty-inc"), function () {
       var id = jQuery(this).closest("." + ns("basket-line")).attr("data-line-id");
       MenuCore.incQty(id);
@@ -1751,7 +1964,6 @@ var MenuBasket = (function () {
       var id = jQuery(this).closest("." + ns("basket-line")).attr("data-line-id");
       MenuCore.removeLine(id);
     });
-
     _$root.on("click", "." + ns("line-edit"), function () {
       var id = jQuery(this).closest("." + ns("basket-line")).attr("data-line-id");
       var line = MenuCore.getBasket().find(function (x) { return x.lineId === id; });
@@ -1759,16 +1971,38 @@ var MenuBasket = (function () {
     });
 
     _$root.on("click", "." + ns("btn-next-serving"), function () {
-      var basket = MenuCore.getBasket();
+      var sid = MenuCore.getActiveSectionId();
+      var basket = MenuCore.getBasketBySection(sid);
       if (typeof cfg.onNextServing === "function") cfg.onNextServing(basket);
-      MenuCore.nextServing();
+      MenuCore.nextServing(sid);
     });
 
     _$root.on("click", "." + ns("btn-send-order"), function () {
+      var servingsBySection = {};
+      MenuCore.getBasketSections().forEach(function (s) {
+        var all = MenuCore.getServings(s.id).slice();   // completed servings
+        var current = MenuCore.getBasketBySection(s.id); // active serving items
+        if (current.length) all.push({ serving: MenuCore.getServing(s.id), lines: current });
+        if (all.length) servingsBySection[s.id] = all;
+      });
+      var rawBasket = MenuCore.getBasket();
+      var basketMap = {};
+      var basketOrder = [];
+      rawBasket.forEach(function (l) {
+        var key = l.item.id;
+        if (basketMap[key]) {
+          basketMap[key].qty += l.qty;
+        } else {
+          basketMap[key] = jQuery.extend(true, {}, l);
+          basketOrder.push(key);
+        }
+      });
+      var mergedBasket = basketOrder.map(function (k) { return basketMap[k]; });
+
       var order = {
         table: MenuCore.getTable(),
-        serving: MenuCore.getServing(),
-        basket: MenuCore.getBasket(),
+        basket: mergedBasket,
+        servings: servingsBySection,
         existingOrder: MenuCore.getExistingOrder(),
         total: MenuCore.getBasketTotal()
       };
