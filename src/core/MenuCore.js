@@ -244,14 +244,24 @@ var MenuCore = (function () {
   function resolveSection(item, overrideSectionId) {
     if (overrideSectionId) return overrideSectionId;
     if (item && item.basketSection) return item.basketSection;
-    var cat = getCategory(item && item.categoryId);
-    if (cat) {
-      if (item && item.subcategoryId && Array.isArray(cat.subcategories)) {
-        var sub = cat.subcategories.find(function (s) { return s.id === item.subcategoryId; });
-        if (sub && sub.basketSection) return sub.basketSection;
+
+    // Scan all categories to find the subcategory and its parent.
+    // Subcategory basketSection wins; if absent, use the parent category's.
+    if (item && item.subcategoryId) {
+      var cats = getCategories();
+      for (var i = 0; i < cats.length; i++) {
+        var subs = cats[i].subcategories || [];
+        var sub = subs.find(function (s) { return s.id === item.subcategoryId; });
+        if (sub) {
+          if (sub.basketSection) return sub.basketSection;
+          if (cats[i].basketSection) return cats[i].basketSection;
+          break;
+        }
       }
-      if (cat.basketSection) return cat.basketSection;
     }
+
+    var cat = getCategory(item && item.categoryId);
+    if (cat && cat.basketSection) return cat.basketSection;
     return _cfg.defaultBasketSection;
   }
 
