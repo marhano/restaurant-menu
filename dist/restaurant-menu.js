@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-28T06:39:55.622Z
+ * Built: 2026-04-29T03:12:55.592Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -56,6 +56,7 @@ var MenuConfig = (function () {
     showEllipsis: true, // per-item "…" menu to choose basket section
     showSendOrderButton: true,
     showNextServingButton: true,
+    showTotals: true,
 
     // Animation level
     //   false -> baseline transitions only
@@ -247,6 +248,7 @@ var MenuCore = (function () {
 
   // Basket lines: { lineId, item, qty, note, sectionId }
   var _basket = [];
+  var _existingOrder = [];
   var _lineSeq = 1;
 
   // ── Setup ─────────────────────────────────────────
@@ -255,6 +257,7 @@ var MenuCore = (function () {
     _cfg = cfg;
     _table = cfg.table ? jQuery.extend(true, {}, cfg.table) : null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     _search = "";
@@ -267,6 +270,7 @@ var MenuCore = (function () {
   function reset() {
     _cfg = null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     _search = "";
@@ -327,10 +331,12 @@ var MenuCore = (function () {
   function startNewOrder(table) {
     _table = table ? jQuery.extend(true, {}, table) : null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     MenuEvents.emit("table:changed", _table);
     MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("existingOrder:changed");
     MenuEvents.emit("serving:changed", _serving);
   }
 
@@ -587,10 +593,9 @@ var MenuCore = (function () {
    * Unknown itemIds are silently skipped.
    */
   function setBasket(lines) {
-    _basket = [];
-    _lineSeq = 1;
+    _existingOrder = [];
     if (!Array.isArray(lines)) {
-      MenuEvents.emit("basket:changed", { reason: "clear" });
+      MenuEvents.emit("existingOrder:changed");
       return;
     }
     lines.forEach(function (entry) {
@@ -599,15 +604,28 @@ var MenuCore = (function () {
         console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
         return;
       }
-      _basket.push({
-        lineId: "L" + (_lineSeq++),
+      var qty = Math.max(1, parseInt(entry.Quantity, 10) || 1);
+      var existing = _existingOrder.find(function (l) { return l.item.id === item.id; });
+      if (existing) {
+        existing.qty += qty;
+        return;
+      }
+      _existingOrder.push({
+        lineId: "EL" + (_lineSeq++),
         item: jQuery.extend(true, {}, item),
-        qty: Math.max(1, parseInt(entry.Quantity, 10) || 1),
+        qty: qty,
         note: entry.Note || "",
         sectionId: resolveSection(item, null)
       });
     });
-    MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("existingOrder:changed");
+  }
+
+  function getExistingOrder() { return _existingOrder.slice(); }
+
+  function clearExistingOrder() {
+    _existingOrder = [];
+    MenuEvents.emit("existingOrder:changed");
   }
 
   // ── Table & serving ───────────────────────────────
@@ -678,6 +696,8 @@ var MenuCore = (function () {
     resolveSection: resolveSection,
 
     // Basket
+    getExistingOrder: getExistingOrder,
+    clearExistingOrder: clearExistingOrder,
     getBasket: getBasket,
     getBasketBySection: getBasketBySection,
     getBasketTotal: getBasketTotal,
@@ -939,9 +959,28 @@ var MenuRender = (function () {
     return jQuery("<div>").addClass(ns("basket")).append(
       jQuery("<div>").addClass(ns("basket-header")),
       jQuery("<div>").addClass(ns("basket-tabs")),
+      jQuery("<div>").addClass(ns("existing-order")),
       jQuery("<div>").addClass(ns("basket-list")),
       jQuery("<div>").addClass(ns("basket-footer"))
     );
+  }
+
+  function buildExistingOrderLine(line, priceText, totalText) {
+    var $row = jQuery("<div>").addClass(ns("existing-order-line"));
+    var $main = jQuery("<div>").addClass(ns("existing-order-line-main"));
+    $main.append(jQuery("<div>").addClass(ns("existing-order-line-name")).text(line.item.name || ""));
+    $main.append(jQuery("<div>").addClass(ns("existing-order-line-price")).text(priceText));
+    if (line.note) {
+      $main.append(
+        jQuery("<div>").addClass(ns("basket-line-note"))
+          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
+          .append(jQuery("<span>").text(line.note))
+      );
+    }
+    $row.append($main);
+    $row.append(jQuery("<div>").addClass(ns("existing-order-line-qty")).text("\xD7" + line.qty));
+    $row.append(jQuery("<div>").addClass(ns("existing-order-line-total")).text(totalText));
+    return $row;
   }
 
   function buildBasketSectionTab(section, activeId, count) {
@@ -1004,11 +1043,13 @@ var MenuRender = (function () {
     $f.append(
       jQuery("<div>").addClass(ns("basket-serving")).text(servingLabel)
     );
-    $f.append(
-      jQuery("<div>").addClass(ns("basket-total"))
-        .append(jQuery("<span>").addClass(ns("basket-total-label")).text("Total"))
-        .append(jQuery("<span>").addClass(ns("basket-total-value")).text(totalText))
-    );
+    if (cfg.showTotals !== false) {
+      $f.append(
+        jQuery("<div>").addClass(ns("basket-total"))
+          .append(jQuery("<span>").addClass(ns("basket-total-label")).text("Total"))
+          .append(jQuery("<span>").addClass(ns("basket-total-value")).text(totalText))
+      );
+    }
     var $btns = jQuery("<div>").addClass(ns("basket-btns"));
     if (cfg.showNextServingButton) {
       $btns.append(
@@ -1043,7 +1084,8 @@ var MenuRender = (function () {
     buildBasketSectionTab: buildBasketSectionTab,
     buildBasketLine: buildBasketLine,
     buildEmptyBasket: buildEmptyBasket,
-    buildBasketFooter: buildBasketFooter
+    buildBasketFooter: buildBasketFooter,
+    buildExistingOrderLine: buildExistingOrderLine
   };
 })();
 
@@ -1441,13 +1483,48 @@ var MenuBasket = (function () {
     MenuEvents.on("section:changed", _renderAll);
     MenuEvents.on("sections:changed", _renderAll);
     MenuEvents.on("serving:changed", _renderFooter);
+    MenuEvents.on("existingOrder:changed", _renderExistingOrder);
   }
 
   function _renderAll() {
     _renderHeader();
     _renderTabs();
     _renderList();
+    _renderExistingOrder();
     _renderFooter();
+  }
+
+  function _renderExistingOrder() {
+    var ns = MenuRender.ns;
+    var lines = MenuCore.getExistingOrder();
+    var $slot = _$root.find("." + ns("existing-order")).empty();
+
+    if (!lines.length) return;
+
+    var count = lines.reduce(function (s, l) { return s + l.qty; }, 0);
+    var $toggle = jQuery("<button type='button'>").addClass(ns("existing-order-toggle"))
+      .append(jQuery("<i>").addClass("fa-solid fa-clock-rotate-left"))
+      .append(jQuery("<span>").text("Previous Order"))
+      .append(jQuery("<span>").addClass(ns("existing-order-count")).text(count + " item" + (count !== 1 ? "s" : "")))
+      .append(jQuery("<i>").addClass("fa-solid fa-chevron-down " + ns("existing-order-chevron")));
+    $slot.append($toggle);
+
+    var $body = jQuery("<div>").addClass(ns("existing-order-body"));
+    lines.forEach(function (l) {
+      var price = MenuCore.formatPrice(l.item.price);
+      var total = MenuCore.formatPrice((Number(l.item.price) || 0) * l.qty);
+      $body.append(MenuRender.buildExistingOrderLine(l, price, total));
+    });
+
+    if (MenuCore.getConfig().showTotals !== false) {
+      var grandTotal = lines.reduce(function (s, l) { return s + (Number(l.item.price) || 0) * l.qty; }, 0);
+      $body.append(
+        jQuery("<div>").addClass(ns("existing-order-total"))
+          .append(jQuery("<span>").text("Previous total"))
+          .append(jQuery("<span>").text(MenuCore.formatPrice(grandTotal)))
+      );
+    }
+    $slot.append($body);
   }
 
   function _renderHeader() {
@@ -1529,18 +1606,30 @@ var MenuBasket = (function () {
 
     if (evt.reason === "add") {
       $list.find("." + ns("basket-empty")).remove();
+      var listEl = $list[0];
+      listEl.scrollTop = listEl.scrollHeight;
       var price = MenuCore.formatPrice(line.item.price);
       var total = MenuCore.formatPrice((Number(line.item.price) || 0) * line.qty);
       var $new = MenuRender.buildBasketLine(line, price, total, cfg.labels)
         .addClass(ns("basket-line--enter"));
       $list.append($new);
+      listEl.scrollTop = listEl.scrollHeight;
       setTimeout(function () { $new.removeClass(ns("basket-line--enter")); }, 360);
       return;
     }
 
     if (evt.reason === "remove") {
       if (!$existing.length) { _renderList(); return; }
-      $existing.addClass(ns("basket-line--leave"));
+      var el = $existing[0];
+      var h = el.offsetHeight;
+      el.style.height = h + "px";
+      el.style.overflow = "hidden";
+      el.style.transition = "height 0.26s cubic-bezier(0.55,0,0.68,0.2), opacity 0.22s ease, transform 0.26s cubic-bezier(0.55,0,0.68,0.2)";
+      // Force reflow so transition picks up the pinned height
+      void el.offsetHeight;
+      el.style.height = "0px";
+      el.style.opacity = "0";
+      el.style.transform = "translateX(28px)";
       setTimeout(function () {
         $existing.remove();
         if (!$list.find("." + ns("basket-line")).length) _renderList();
@@ -1613,6 +1702,10 @@ var MenuBasket = (function () {
       MenuCore.setActiveSection(jQuery(this).attr("data-section-id"));
     });
 
+    _$root.on("click", "." + ns("existing-order-toggle"), function () {
+      _$root.find("." + ns("existing-order")).toggleClass(ns("existing-order--open"));
+    });
+
     _$root.on("click", "." + ns("qty-inc"), function () {
       var id = jQuery(this).closest("." + ns("basket-line")).attr("data-line-id");
       MenuCore.incQty(id);
@@ -1643,6 +1736,7 @@ var MenuBasket = (function () {
         table: MenuCore.getTable(),
         serving: MenuCore.getServing(),
         basket: MenuCore.getBasket(),
+        existingOrder: MenuCore.getExistingOrder(),
         total: MenuCore.getBasketTotal()
       };
       if (typeof cfg.onSendOrder === "function") {
@@ -1775,6 +1869,7 @@ var RestaurantMenu = (function () {
     function openMenuModal() {
       if (!cfg.modal || _menuModalOpen) return;
       MenuCore.clearBasket();
+      MenuCore.clearExistingOrder();
       _menuModalOpen = true;
       $menuOverlay.addClass("rm-menu-overlay--open");
       jQuery("body").css("overflow", "hidden");
@@ -1880,6 +1975,7 @@ var RestaurantMenu = (function () {
 
       // Basket ops
       loadBasket:       function (lines) { MenuCore.setBasket(lines); },
+      getExistingOrder: function () { return MenuCore.getExistingOrder(); },
       addItem:          function (itemId, sectionId) { return MenuCore.addItem(itemId, sectionId); },
       incQty:           function (lineId) { MenuCore.incQty(lineId); },
       decQty:           function (lineId) { MenuCore.decQty(lineId); },

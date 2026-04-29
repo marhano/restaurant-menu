@@ -233,9 +233,28 @@ var MenuRender = (function () {
     return jQuery("<div>").addClass(ns("basket")).append(
       jQuery("<div>").addClass(ns("basket-header")),
       jQuery("<div>").addClass(ns("basket-tabs")),
+      jQuery("<div>").addClass(ns("existing-order")),
       jQuery("<div>").addClass(ns("basket-list")),
       jQuery("<div>").addClass(ns("basket-footer"))
     );
+  }
+
+  function buildExistingOrderLine(line, priceText, totalText) {
+    var $row = jQuery("<div>").addClass(ns("existing-order-line"));
+    var $main = jQuery("<div>").addClass(ns("existing-order-line-main"));
+    $main.append(jQuery("<div>").addClass(ns("existing-order-line-name")).text(line.item.name || ""));
+    $main.append(jQuery("<div>").addClass(ns("existing-order-line-price")).text(priceText));
+    if (line.note) {
+      $main.append(
+        jQuery("<div>").addClass(ns("basket-line-note"))
+          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
+          .append(jQuery("<span>").text(line.note))
+      );
+    }
+    $row.append($main);
+    $row.append(jQuery("<div>").addClass(ns("existing-order-line-qty")).text("\xD7" + line.qty));
+    $row.append(jQuery("<div>").addClass(ns("existing-order-line-total")).text(totalText));
+    return $row;
   }
 
   function buildBasketSectionTab(section, activeId, count) {
@@ -298,11 +317,13 @@ var MenuRender = (function () {
     $f.append(
       jQuery("<div>").addClass(ns("basket-serving")).text(servingLabel)
     );
-    $f.append(
-      jQuery("<div>").addClass(ns("basket-total"))
-        .append(jQuery("<span>").addClass(ns("basket-total-label")).text("Total"))
-        .append(jQuery("<span>").addClass(ns("basket-total-value")).text(totalText))
-    );
+    if (cfg.showTotals !== false) {
+      $f.append(
+        jQuery("<div>").addClass(ns("basket-total"))
+          .append(jQuery("<span>").addClass(ns("basket-total-label")).text("Total"))
+          .append(jQuery("<span>").addClass(ns("basket-total-value")).text(totalText))
+      );
+    }
     var $btns = jQuery("<div>").addClass(ns("basket-btns"));
     if (cfg.showNextServingButton) {
       $btns.append(
@@ -337,6 +358,7 @@ var MenuRender = (function () {
     buildBasketSectionTab: buildBasketSectionTab,
     buildBasketLine: buildBasketLine,
     buildEmptyBasket: buildEmptyBasket,
-    buildBasketFooter: buildBasketFooter
+    buildBasketFooter: buildBasketFooter,
+    buildExistingOrderLine: buildExistingOrderLine
   };
 })();

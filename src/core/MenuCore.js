@@ -15,6 +15,7 @@ var MenuCore = (function () {
 
   // Basket lines: { lineId, item, qty, note, sectionId }
   var _basket = [];
+  var _existingOrder = [];
   var _lineSeq = 1;
 
   // ── Setup ─────────────────────────────────────────
@@ -23,6 +24,7 @@ var MenuCore = (function () {
     _cfg = cfg;
     _table = cfg.table ? jQuery.extend(true, {}, cfg.table) : null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     _search = "";
@@ -35,6 +37,7 @@ var MenuCore = (function () {
   function reset() {
     _cfg = null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     _search = "";
@@ -95,10 +98,12 @@ var MenuCore = (function () {
   function startNewOrder(table) {
     _table = table ? jQuery.extend(true, {}, table) : null;
     _basket = [];
+    _existingOrder = [];
     _lineSeq = 1;
     _serving = 1;
     MenuEvents.emit("table:changed", _table);
     MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("existingOrder:changed");
     MenuEvents.emit("serving:changed", _serving);
   }
 
@@ -355,10 +360,9 @@ var MenuCore = (function () {
    * Unknown itemIds are silently skipped.
    */
   function setBasket(lines) {
-    _basket = [];
-    _lineSeq = 1;
+    _existingOrder = [];
     if (!Array.isArray(lines)) {
-      MenuEvents.emit("basket:changed", { reason: "clear" });
+      MenuEvents.emit("existingOrder:changed");
       return;
     }
     lines.forEach(function (entry) {
@@ -367,15 +371,28 @@ var MenuCore = (function () {
         console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
         return;
       }
-      _basket.push({
-        lineId: "L" + (_lineSeq++),
+      var qty = Math.max(1, parseInt(entry.Quantity, 10) || 1);
+      var existing = _existingOrder.find(function (l) { return l.item.id === item.id; });
+      if (existing) {
+        existing.qty += qty;
+        return;
+      }
+      _existingOrder.push({
+        lineId: "EL" + (_lineSeq++),
         item: jQuery.extend(true, {}, item),
-        qty: Math.max(1, parseInt(entry.Quantity, 10) || 1),
+        qty: qty,
         note: entry.Note || "",
         sectionId: resolveSection(item, null)
       });
     });
-    MenuEvents.emit("basket:changed", { reason: "clear" });
+    MenuEvents.emit("existingOrder:changed");
+  }
+
+  function getExistingOrder() { return _existingOrder.slice(); }
+
+  function clearExistingOrder() {
+    _existingOrder = [];
+    MenuEvents.emit("existingOrder:changed");
   }
 
   // ── Table & serving ───────────────────────────────
@@ -446,6 +463,8 @@ var MenuCore = (function () {
     resolveSection: resolveSection,
 
     // Basket
+    getExistingOrder: getExistingOrder,
+    clearExistingOrder: clearExistingOrder,
     getBasket: getBasket,
     getBasketBySection: getBasketBySection,
     getBasketTotal: getBasketTotal,

@@ -468,6 +468,7 @@
   border-bottom: 1px solid var(--rm-border);
   font-weight: 700; color: var(--rm-surface-alt);
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 .rm-basket-title { flex: 1; }
 .rm-basket-count {
@@ -479,6 +480,7 @@
   display: flex; gap: 4px; padding: 8px 10px;
   border-bottom: 1px solid var(--rm-border);
   overflow-x: auto;
+  flex-shrink: 0;
 }
 .rm-basket-tab {
   display: inline-flex; align-items: center; gap: 6px;
@@ -503,10 +505,17 @@
 
 /* ── Basket list ──────────────────────────────────── */
 .rm-basket-list {
-  flex: 1; overflow-y: auto; padding: 8px 10px;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px;
   display: flex; flex-direction: column; gap: 6px;
   overflow-x: hidden;
 }
+
+/* ── Global subtle scrollbar ──────────────────────── */
+.rm-root ::-webkit-scrollbar, .rm-root--modal::-webkit-scrollbar { width: 4px; height: 4px; }
+.rm-root ::-webkit-scrollbar-track, .rm-root--modal::-webkit-scrollbar-track { background: transparent; }
+.rm-root ::-webkit-scrollbar-thumb, .rm-root--modal::-webkit-scrollbar-thumb { background: var(--rm-border-strong) !important; border-radius: 999px; }
+.rm-root ::-webkit-scrollbar-thumb:hover, .rm-root--modal::-webkit-scrollbar-thumb:hover { background: var(--rm-surface-muted); }
+.rm-root * { scrollbar-width: thin; scrollbar-color: var(--rm-border-strong) transparent; }
 .rm-basket-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; padding: 40px 20px;
@@ -562,8 +571,67 @@
 .rm-line-edit:hover   { background: #fff; color: var(--rm-surface-alt); }
 .rm-line-remove:hover { background: #fff; color: var(--rm-danger); }
 
+/* ── Existing Order Accordion ─────────────────────── */
+.rm-existing-order {
+  border-top: 1px solid var(--rm-border);
+  background: var(--rm-surface-bright);
+  flex-shrink: 0;
+}
+
+.rm-existing-order-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: none; border: none; cursor: pointer;
+  font-size: 0.82rem; font-weight: 600;
+  color: var(--rm-surface-muted); text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.rm-existing-order-toggle:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
+
+.rm-existing-order-count {
+  margin-left: auto;
+  font-size: 0.74rem; font-weight: 500;
+  background: var(--rm-surface-dim);
+  border-radius: 999px; padding: 1px 8px;
+  color: var(--rm-surface-muted);
+}
+
+.rm-existing-order-chevron { transition: transform 0.22s; }
+.rm-existing-order--open .rm-existing-order-chevron { transform: rotate(180deg); }
+
+.rm-existing-order-body {
+  display: none;
+  flex-direction: column; gap: 4px;
+  padding: 0 10px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.rm-existing-order--open .rm-existing-order-body { display: flex; }
+
+.rm-existing-order-line {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--rm-border);
+}
+.rm-existing-order-line:last-of-type { border-bottom: none; }
+
+.rm-existing-order-line-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rm-existing-order-line-name  { font-weight: 600; font-size: 0.85rem; color: var(--rm-surface-alt); }
+.rm-existing-order-line-price { font-size: 0.74rem; color: var(--rm-surface-muted); }
+.rm-existing-order-line-qty   { font-size: 0.82rem; color: var(--rm-surface-muted); white-space: nowrap; }
+.rm-existing-order-line-total { font-weight: 700; font-size: 0.85rem; color: var(--rm-surface-alt); min-width: 52px; text-align: right; }
+
+.rm-existing-order-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 4px 0; margin-top: 4px;
+  border-top: 1px solid var(--rm-border-strong);
+  font-size: 0.8rem; font-weight: 600; color: var(--rm-surface-muted);
+}
+
 /* ── Basket footer ────────────────────────────────── */
-.rm-basket-footer { border-top: 1px solid var(--rm-border); }
+.rm-basket-footer { border-top: 1px solid var(--rm-border); flex-shrink: 0; }
 .rm-basket-footer-inner {
   padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;
 }
@@ -610,7 +678,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1001;
   background: rgba(10, 10, 10, 0.52);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);

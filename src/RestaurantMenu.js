@@ -110,6 +110,7 @@ var RestaurantMenu = (function () {
     function openMenuModal() {
       if (!cfg.modal || _menuModalOpen) return;
       MenuCore.clearBasket();
+      MenuCore.clearExistingOrder();
       _menuModalOpen = true;
       $menuOverlay.addClass("rm-menu-overlay--open");
       jQuery("body").css("overflow", "hidden");
@@ -215,6 +216,7 @@ var RestaurantMenu = (function () {
 
       // Basket ops
       loadBasket:       function (lines) { MenuCore.setBasket(lines); },
+      getExistingOrder: function () { return MenuCore.getExistingOrder(); },
       addItem:          function (itemId, sectionId) { return MenuCore.addItem(itemId, sectionId); },
       incQty:           function (lineId) { MenuCore.incQty(lineId); },
       decQty:           function (lineId) { MenuCore.decQty(lineId); },

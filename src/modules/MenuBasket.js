@@ -22,13 +22,48 @@ var MenuBasket = (function () {
     MenuEvents.on("section:changed", _renderAll);
     MenuEvents.on("sections:changed", _renderAll);
     MenuEvents.on("serving:changed", _renderFooter);
+    MenuEvents.on("existingOrder:changed", _renderExistingOrder);
   }
 
   function _renderAll() {
     _renderHeader();
     _renderTabs();
     _renderList();
+    _renderExistingOrder();
     _renderFooter();
+  }
+
+  function _renderExistingOrder() {
+    var ns = MenuRender.ns;
+    var lines = MenuCore.getExistingOrder();
+    var $slot = _$root.find("." + ns("existing-order")).empty();
+
+    if (!lines.length) return;
+
+    var count = lines.reduce(function (s, l) { return s + l.qty; }, 0);
+    var $toggle = jQuery("<button type='button'>").addClass(ns("existing-order-toggle"))
+      .append(jQuery("<i>").addClass("fa-solid fa-clock-rotate-left"))
+      .append(jQuery("<span>").text("Previous Order"))
+      .append(jQuery("<span>").addClass(ns("existing-order-count")).text(count + " item" + (count !== 1 ? "s" : "")))
+      .append(jQuery("<i>").addClass("fa-solid fa-chevron-down " + ns("existing-order-chevron")));
+    $slot.append($toggle);
+
+    var $body = jQuery("<div>").addClass(ns("existing-order-body"));
+    lines.forEach(function (l) {
+      var price = MenuCore.formatPrice(l.item.price);
+      var total = MenuCore.formatPrice((Number(l.item.price) || 0) * l.qty);
+      $body.append(MenuRender.buildExistingOrderLine(l, price, total));
+    });
+
+    if (MenuCore.getConfig().showTotals !== false) {
+      var grandTotal = lines.reduce(function (s, l) { return s + (Number(l.item.price) || 0) * l.qty; }, 0);
+      $body.append(
+        jQuery("<div>").addClass(ns("existing-order-total"))
+          .append(jQuery("<span>").text("Previous total"))
+          .append(jQuery("<span>").text(MenuCore.formatPrice(grandTotal)))
+      );
+    }
+    $slot.append($body);
   }
 
   function _renderHeader() {
@@ -110,18 +145,30 @@ var MenuBasket = (function () {
 
     if (evt.reason === "add") {
       $list.find("." + ns("basket-empty")).remove();
+      var listEl = $list[0];
+      listEl.scrollTop = listEl.scrollHeight;
       var price = MenuCore.formatPrice(line.item.price);
       var total = MenuCore.formatPrice((Number(line.item.price) || 0) * line.qty);
       var $new = MenuRender.buildBasketLine(line, price, total, cfg.labels)
         .addClass(ns("basket-line--enter"));
       $list.append($new);
+      listEl.scrollTop = listEl.scrollHeight;
       setTimeout(function () { $new.removeClass(ns("basket-line--enter")); }, 360);
       return;
     }
 
     if (evt.reason === "remove") {
       if (!$existing.length) { _renderList(); return; }
-      $existing.addClass(ns("basket-line--leave"));
+      var el = $existing[0];
+      var h = el.offsetHeight;
+      el.style.height = h + "px";
+      el.style.overflow = "hidden";
+      el.style.transition = "height 0.26s cubic-bezier(0.55,0,0.68,0.2), opacity 0.22s ease, transform 0.26s cubic-bezier(0.55,0,0.68,0.2)";
+      // Force reflow so transition picks up the pinned height
+      void el.offsetHeight;
+      el.style.height = "0px";
+      el.style.opacity = "0";
+      el.style.transform = "translateX(28px)";
       setTimeout(function () {
         $existing.remove();
         if (!$list.find("." + ns("basket-line")).length) _renderList();
@@ -194,6 +241,10 @@ var MenuBasket = (function () {
       MenuCore.setActiveSection(jQuery(this).attr("data-section-id"));
     });
 
+    _$root.on("click", "." + ns("existing-order-toggle"), function () {
+      _$root.find("." + ns("existing-order")).toggleClass(ns("existing-order--open"));
+    });
+
     _$root.on("click", "." + ns("qty-inc"), function () {
       var id = jQuery(this).closest("." + ns("basket-line")).attr("data-line-id");
       MenuCore.incQty(id);
@@ -224,6 +275,7 @@ var MenuBasket = (function () {
         table: MenuCore.getTable(),
         serving: MenuCore.getServing(),
         basket: MenuCore.getBasket(),
+        existingOrder: MenuCore.getExistingOrder(),
         total: MenuCore.getBasketTotal()
       };
       if (typeof cfg.onSendOrder === "function") {

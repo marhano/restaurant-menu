@@ -47,6 +47,7 @@ var MenuConfig = (function () {
     showEllipsis: true, // per-item "…" menu to choose basket section
     showSendOrderButton: true,
     showNextServingButton: true,
+    showTotals: true,
 
     // Animation level
     //   false -> baseline transitions only
