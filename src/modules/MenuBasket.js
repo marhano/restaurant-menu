@@ -12,6 +12,7 @@ var MenuBasket = (function () {
     $right.empty().append(MenuRender.buildBasketPanel());
     _renderAll();
     _bind();
+    _initDragDrop();
 
     MenuEvents.on("basket:changed", function (evt) {
       _renderHeader();
@@ -165,7 +166,11 @@ var MenuBasket = (function () {
         .attr("data-section-id", activeSectionId)
         .append(jQuery("<i>").addClass("fa-solid fa-trash-can"));
 
-      $acc.append(jQuery("<div>").addClass(ns("serving-acc-header")).append($toggle, $removeBtn));
+      var $handle = jQuery("<button type='button'>").addClass(ns("serving-acc-handle"))
+        .attr("aria-label", "Drag to reorder").attr("title", "Drag to reorder")
+        .append(jQuery("<i>").addClass("fa-solid fa-grip-vertical"));
+
+      $acc.append(jQuery("<div>").addClass(ns("serving-acc-header")).append($handle, $toggle, $removeBtn));
 
       // Body — ALL servings are fully editable
       var $body = jQuery("<div>").addClass(ns("serving-acc-body"));
@@ -450,6 +455,344 @@ var MenuBasket = (function () {
       } else {
         MenuCore.clearBasket();
       }
+    });
+  }
+
+  function _initDragDrop() {
+    var ns = MenuRender.ns;
+    var LINE_SEL = "." + ns("basket-line") + ", ." + ns("serving-line");
+    var dragState = null;
+
+    // ── Shared helpers ────────────────────────────────
+
+    function startDrag($el, lineId, clientX, clientY) {
+      var rect = $el[0].getBoundingClientRect();
+      var $ghost = $el.clone().css({
+        position: "fixed",
+        left: rect.left, top: rect.top, width: rect.width,
+        zIndex: 9999, opacity: 0.88, pointerEvents: "none",
+        boxShadow: "0 8px 28px rgba(0,0,0,0.22)",
+        borderRadius: "8px", margin: 0, transition: "none",
+        background: "var(--rm-surface)", border: "1px solid var(--rm-border)"
+      }).addClass(ns("drag-ghost"));
+      jQuery("body").append($ghost);
+      $el.addClass(ns("dragging"));
+      dragState = {
+        lineId: lineId, $ghost: $ghost,
+        offsetX: clientX - rect.left, offsetY: clientY - rect.top
+      };
+    }
+
+    function elAt(x, y) {
+      if (!dragState || !dragState.$ghost) return document.elementFromPoint(x, y);
+      var ghost = dragState.$ghost[0];
+      ghost.style.visibility = "hidden";
+      var el = document.elementFromPoint(x, y);
+      ghost.style.visibility = "";
+      return el;
+    }
+
+    function highlight(x, y) {
+      _$root.find("." + ns("drag-over")).removeClass(ns("drag-over"));
+      var el = elAt(x, y);
+      if (!el || !dragState) return;
+      var $line = jQuery(el).closest(LINE_SEL);
+      if ($line.length && $line.attr("data-line-id") !== dragState.lineId) {
+        $line.addClass(ns("drag-over")); return;
+      }
+      var $acc = jQuery(el).closest("." + ns("serving-acc"));
+      if ($acc.length) { $acc.addClass(ns("drag-over")); return; }
+      var $bl = jQuery(el).closest("." + ns("basket-list"));
+      if ($bl.length) $bl.addClass(ns("drag-over"));
+    }
+
+    function cancelDrag() {
+      if (!dragState) return;
+      dragState.$ghost.remove();
+      _$root.find("." + ns("drag-over")).removeClass(ns("drag-over"));
+      _$root.find("." + ns("dragging")).removeClass(ns("dragging"));
+      dragState = null;
+    }
+
+    function commitDrop(x, y) {
+      if (!dragState) return;
+      var savedLineId = dragState.lineId;
+      cancelDrag();
+      var el = document.elementFromPoint(x, y);
+      if (!el) return;
+
+      var $line = jQuery(el).closest(LINE_SEL);
+      if ($line.length) {
+        var toLineId = $line.attr("data-line-id");
+        if (toLineId && toLineId !== savedLineId) {
+          var basket = MenuCore.getBasket();
+          var fromLine = null, toLine = null;
+          for (var i = 0; i < basket.length; i++) {
+            if (basket[i].lineId === savedLineId) fromLine = basket[i];
+            if (basket[i].lineId === toLineId) toLine = basket[i];
+          }
+          if (fromLine && toLine) {
+            if (fromLine.item.id === toLine.item.id) MenuCore.mergeLines(savedLineId, toLineId);
+            else MenuCore.moveLine(savedLineId, toLineId);
+          }
+        }
+        return;
+      }
+
+      var $acc = jQuery(el).closest("." + ns("serving-acc"));
+      if ($acc.length) {
+        var n = parseInt($acc.attr("data-serving"), 10);
+        if (!isNaN(n)) MenuCore.moveLineToServing(savedLineId, n, MenuCore.getActiveSectionId());
+        return;
+      }
+
+      var $bl = jQuery(el).closest("." + ns("basket-list"));
+      if ($bl.length) {
+        var sid = MenuCore.getActiveSectionId();
+        MenuCore.moveLineToServing(savedLineId, MenuCore.getServing(sid), sid);
+      }
+    }
+
+    // ── Mouse / pen (Pointer Events, excludes touch) ──
+
+    _$root.on("pointerdown", LINE_SEL, function (e) {
+      var ne = e.originalEvent;
+      if (ne.pointerType === "touch") return; // touch handled below
+      if (ne.button !== 0) return;
+      if (jQuery(ne.target).closest("button, input, select").length) return;
+      if (dragState) return;
+
+      var $el = jQuery(this);
+      var lineId = $el.attr("data-line-id");
+      if (!lineId) return;
+
+      var sx = ne.clientX, sy = ne.clientY;
+      var timer = setTimeout(function () { startDrag($el, lineId, sx, sy); }, 220);
+
+      jQuery(document)
+        .on("pointermove.rmdnd", function (e2) {
+          var r = e2.originalEvent; var x = r.clientX, y = r.clientY;
+          if (!dragState) {
+            if (Math.abs(x - sx) > 8 || Math.abs(y - sy) > 8) {
+              clearTimeout(timer); jQuery(document).off(".rmdnd");
+            }
+            return;
+          }
+          dragState.$ghost.css({ left: x - dragState.offsetX, top: y - dragState.offsetY });
+          highlight(x, y);
+        })
+        .on("pointerup.rmdnd", function (e2) {
+          clearTimeout(timer); jQuery(document).off(".rmdnd");
+          if (!dragState) return;
+          var r = e2.originalEvent; commitDrop(r.clientX, r.clientY);
+        })
+        .on("pointercancel.rmdnd", function () {
+          clearTimeout(timer); jQuery(document).off(".rmdnd"); cancelDrag();
+        });
+    });
+
+    // ── Touch (mobile) ────────────────────────────────
+    // Uses native listeners so touchmove can be registered non-passive,
+    // allowing preventDefault() to block scroll once drag activates.
+
+    _$root.on("touchstart", LINE_SEL, function (e) {
+      var ne = e.originalEvent;
+      if (jQuery(ne.target).closest("button, input, select").length) return;
+      if (dragState) return;
+
+      var $el = jQuery(this);
+      var lineId = $el.attr("data-line-id");
+      if (!lineId) return;
+
+      var t0 = ne.touches[0];
+      var sx = t0.clientX, sy = t0.clientY;
+      var timer = null, fired = false;
+
+      timer = setTimeout(function () {
+        fired = true;
+        startDrag($el, lineId, sx, sy);
+      }, 220);
+
+      function onTouchMove(e2) {
+        var t = e2.changedTouches[0];
+        if (!fired) {
+          if (Math.abs(t.clientX - sx) > 8 || Math.abs(t.clientY - sy) > 8) {
+            clearTimeout(timer); cleanup();
+          }
+          return;
+        }
+        if (!dragState) return;
+        e2.preventDefault(); // prevents scroll while dragging
+        dragState.$ghost.css({ left: t.clientX - dragState.offsetX, top: t.clientY - dragState.offsetY });
+        highlight(t.clientX, t.clientY);
+      }
+
+      function onTouchEnd(e2) {
+        clearTimeout(timer); cleanup();
+        if (!dragState) return;
+        var t = e2.changedTouches[0];
+        commitDrop(t.clientX, t.clientY);
+      }
+
+      function onTouchCancel() {
+        clearTimeout(timer); cleanup(); cancelDrag();
+      }
+
+      function cleanup() {
+        document.removeEventListener("touchmove", onTouchMove);
+        document.removeEventListener("touchend", onTouchEnd);
+        document.removeEventListener("touchcancel", onTouchCancel);
+      }
+
+      document.addEventListener("touchmove", onTouchMove, { passive: false });
+      document.addEventListener("touchend", onTouchEnd);
+      document.addEventListener("touchcancel", onTouchCancel);
+    });
+
+    // ── Accordion reorder ─────────────────────────────
+    var HANDLE_SEL = "." + ns("serving-acc-handle");
+
+    function getAccInsertInfo(y) {
+      var $accs = _$root.find("." + ns("servings-list") + " ." + ns("serving-acc"));
+      if (!$accs.length) return null;
+      var result = { serving: parseInt($accs.last().attr("data-serving"), 10), pos: "after" };
+      for (var ai = 0; ai < $accs.length; ai++) {
+        var rect = $accs[ai].getBoundingClientRect();
+        if (y <= rect.top + rect.height / 2) {
+          result = { serving: parseInt(jQuery($accs[ai]).attr("data-serving"), 10), pos: "before" };
+          break;
+        }
+      }
+      return result;
+    }
+
+    function highlightAccInsert(y) {
+      _$root.find("." + ns("acc-insert-before") + ", ." + ns("acc-insert-after"))
+            .removeClass(ns("acc-insert-before") + " " + ns("acc-insert-after"));
+      var info = getAccInsertInfo(y);
+      if (!info) return;
+      _$root.find("." + ns("serving-acc") + "[data-serving='" + info.serving + "']")
+            .addClass(ns("acc-insert-" + info.pos));
+    }
+
+    function commitAccDrop(y, fromN, sid) {
+      _$root.find("." + ns("acc-insert-before") + ", ." + ns("acc-insert-after"))
+            .removeClass(ns("acc-insert-before") + " " + ns("acc-insert-after"));
+      _$root.find("." + ns("dragging")).removeClass(ns("dragging"));
+      var info = getAccInsertInfo(y);
+      if (!info) return;
+      var cur = MenuCore.getServing(sid);
+      var insertBefore = info.pos === "before" ? info.serving : null;
+      var toN;
+      if (insertBefore === null) {
+        toN = cur - 1;
+      } else if (fromN < insertBefore) {
+        toN = insertBefore - 1;
+      } else if (fromN > insertBefore) {
+        toN = insertBefore;
+      } else {
+        return;
+      }
+      if (toN !== fromN && toN >= 1 && toN < cur) {
+        MenuCore.reorderServings(fromN, toN, sid);
+      }
+    }
+
+    function makeAccGhost($acc) {
+      var rect = $acc[0].getBoundingClientRect();
+      return $acc.find("." + ns("serving-acc-header")).clone().css({
+        position: "fixed", left: rect.left, width: rect.width,
+        zIndex: 9999, opacity: 0.88, pointerEvents: "none",
+        boxShadow: "0 8px 28px rgba(0,0,0,0.22)", borderRadius: "8px",
+        margin: 0, transition: "none",
+        background: "var(--rm-surface)", border: "1px solid var(--rm-border)"
+      }).addClass(ns("drag-ghost"));
+    }
+
+    // Accordion drag — mouse/pen
+    _$root.on("pointerdown", HANDLE_SEL, function (e) {
+      var ne = e.originalEvent;
+      if (ne.pointerType === "touch") return;
+      if (ne.button !== 0) return;
+      if (dragState) return;
+      e.stopPropagation();
+
+      var $acc = jQuery(this).closest("." + ns("serving-acc"));
+      var fromN = parseInt($acc.attr("data-serving"), 10);
+      if (isNaN(fromN)) return;
+      var sid = MenuCore.getActiveSectionId();
+
+      var $ghost = makeAccGhost($acc).css("top", ne.clientY - 20);
+      jQuery("body").append($ghost);
+      $acc.addClass(ns("dragging"));
+      dragState = { type: "acc", $ghost: $ghost };
+
+      jQuery(document)
+        .on("pointermove.rmdndacc", function (e2) {
+          var r = e2.originalEvent;
+          $ghost.css("top", r.clientY - 20);
+          highlightAccInsert(r.clientY);
+        })
+        .on("pointerup.rmdndacc", function (e2) {
+          jQuery(document).off(".rmdndacc");
+          $ghost.remove();
+          dragState = null;
+          commitAccDrop(e2.originalEvent.clientY, fromN, sid);
+        })
+        .on("pointercancel.rmdndacc", function () {
+          jQuery(document).off(".rmdndacc");
+          $ghost.remove();
+          _$root.find("." + ns("acc-insert-before") + ", ." + ns("acc-insert-after"))
+                .removeClass(ns("acc-insert-before") + " " + ns("acc-insert-after"));
+          _$root.find("." + ns("dragging")).removeClass(ns("dragging"));
+          dragState = null;
+        });
+    });
+
+    // Accordion drag — touch
+    _$root.on("touchstart", HANDLE_SEL, function (e) {
+      if (dragState) return;
+      e.stopPropagation();
+
+      var $acc = jQuery(this).closest("." + ns("serving-acc"));
+      var fromN = parseInt($acc.attr("data-serving"), 10);
+      if (isNaN(fromN)) return;
+      var sid = MenuCore.getActiveSectionId();
+      var t0 = e.originalEvent.touches[0];
+
+      var $ghost = makeAccGhost($acc).css("top", t0.clientY - 20);
+      jQuery("body").append($ghost);
+      $acc.addClass(ns("dragging"));
+      dragState = { type: "acc", $ghost: $ghost };
+
+      function onTouchMoveAcc(e2) {
+        e2.preventDefault();
+        var t = e2.changedTouches[0];
+        $ghost.css("top", t.clientY - 20);
+        highlightAccInsert(t.clientY);
+      }
+      function onTouchEndAcc(e2) {
+        cleanupAcc();
+        var t = e2.changedTouches[0];
+        dragState = null;
+        commitAccDrop(t.clientY, fromN, sid);
+      }
+      function onTouchCancelAcc() {
+        cleanupAcc();
+        _$root.find("." + ns("acc-insert-before") + ", ." + ns("acc-insert-after"))
+              .removeClass(ns("acc-insert-before") + " " + ns("acc-insert-after"));
+        _$root.find("." + ns("dragging")).removeClass(ns("dragging"));
+        dragState = null;
+      }
+      function cleanupAcc() {
+        $ghost.remove();
+        document.removeEventListener("touchmove", onTouchMoveAcc);
+        document.removeEventListener("touchend", onTouchEndAcc);
+        document.removeEventListener("touchcancel", onTouchCancelAcc);
+      }
+      document.addEventListener("touchmove", onTouchMoveAcc, { passive: false });
+      document.addEventListener("touchend", onTouchEndAcc);
+      document.addEventListener("touchcancel", onTouchCancelAcc);
     });
   }
 

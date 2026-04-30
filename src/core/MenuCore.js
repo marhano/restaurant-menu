@@ -324,6 +324,25 @@ var MenuCore = (function () {
     }, 0);
   }
 
+  // Returns true if a past serving was emptied and renumbering occurred.
+  function _cleanupServingIfEmpty(sectionId, servingNum) {
+    var cur = _sectionServings[sectionId] || 1;
+    if (servingNum >= cur) return false; // current serving — nothing to renumber
+    var hasLines = false;
+    for (var i = 0; i < _basket.length; i++) {
+      if (_basket[i].sectionId === sectionId && _basket[i].serving === servingNum) {
+        hasLines = true; break;
+      }
+    }
+    if (hasLines) return false;
+    // Shift all higher serving numbers down by 1 for this section
+    _basket.forEach(function (l) {
+      if (l.sectionId === sectionId && l.serving > servingNum) l.serving -= 1;
+    });
+    _sectionServings[sectionId] = cur - 1;
+    return true;
+  }
+
   function _findLine(itemId, sectionId) {
     var cur = _sectionServings[sectionId] || 1;
     return _basket.find(function (l) {
@@ -371,7 +390,8 @@ var MenuCore = (function () {
     l.qty -= 1;
     if (l.qty <= 0) {
       _basket.splice(idx, 1);
-      MenuEvents.emit("basket:changed", { line: l, reason: "remove" });
+      var renumbered = _cleanupServingIfEmpty(l.sectionId, l.serving);
+      MenuEvents.emit("basket:changed", { line: l, reason: renumbered ? "clear" : "remove" });
     } else {
       MenuEvents.emit("basket:changed", { line: l, reason: "qty" });
     }
@@ -381,7 +401,8 @@ var MenuCore = (function () {
     var idx = _basket.findIndex(function (x) { return x.lineId === lineId; });
     if (idx === -1) return;
     var removed = _basket.splice(idx, 1)[0];
-    MenuEvents.emit("basket:changed", { line: removed, reason: "remove" });
+    var renumbered = _cleanupServingIfEmpty(removed.sectionId, removed.serving);
+    MenuEvents.emit("basket:changed", { line: removed, reason: renumbered ? "clear" : "remove" });
   }
 
   function setLineNote(lineId, note) {
@@ -424,6 +445,99 @@ var MenuCore = (function () {
     if ((_sectionServings[sid] || 1) > n) {
       _sectionServings[sid] = (_sectionServings[sid] || 1) - 1;
     }
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
+  // ── Drag-and-drop basket ops ──────────────────────
+
+  function mergeLines(fromLineId, toLineId) {
+    var fromIdx = -1, toLine = null;
+    for (var i = 0; i < _basket.length; i++) {
+      if (_basket[i].lineId === fromLineId) fromIdx = i;
+      if (_basket[i].lineId === toLineId) toLine = _basket[i];
+    }
+    if (fromIdx === -1 || !toLine) return;
+    toLine.qty += _basket[fromIdx].qty;
+    var removed = _basket.splice(fromIdx, 1)[0];
+    _cleanupServingIfEmpty(removed.sectionId, removed.serving);
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
+  function moveLine(fromLineId, toLineId) {
+    var fromIdx = -1, toIdx = -1;
+    for (var i = 0; i < _basket.length; i++) {
+      if (_basket[i].lineId === fromLineId) fromIdx = i;
+      if (_basket[i].lineId === toLineId) toIdx = i;
+    }
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    var fromLine = _basket[fromIdx];
+    var toLine = _basket[toIdx];
+    var oldServing = fromLine.serving;
+    var oldSectionId = fromLine.sectionId;
+    fromLine.serving = toLine.serving;
+    fromLine.sectionId = toLine.sectionId;
+    _basket.splice(fromIdx, 1);
+    var newToIdx = -1;
+    for (var j = 0; j < _basket.length; j++) {
+      if (_basket[j].lineId === toLineId) { newToIdx = j; break; }
+    }
+    if (newToIdx !== -1) _basket.splice(newToIdx, 0, fromLine);
+    else _basket.push(fromLine);
+    _cleanupServingIfEmpty(oldSectionId, oldServing);
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
+  function moveLineToServing(fromLineId, targetServing, targetSectionId) {
+    var fromIdx = -1;
+    for (var i = 0; i < _basket.length; i++) {
+      if (_basket[i].lineId === fromLineId) { fromIdx = i; break; }
+    }
+    if (fromIdx === -1) return;
+    var fromLine = _basket[fromIdx];
+    var sid = targetSectionId || fromLine.sectionId;
+    if (fromLine.serving === targetServing && fromLine.sectionId === sid) return;
+    var oldServing = fromLine.serving;
+    var oldSectionId = fromLine.sectionId;
+    var existing = null;
+    for (var k = 0; k < _basket.length; k++) {
+      var l = _basket[k];
+      if (l.lineId !== fromLineId && l.sectionId === sid && l.serving === targetServing && l.item.id === fromLine.item.id) {
+        existing = l; break;
+      }
+    }
+    if (existing) {
+      existing.qty += fromLine.qty;
+      _basket.splice(fromIdx, 1);
+    } else {
+      fromLine.serving = targetServing;
+      fromLine.sectionId = sid;
+    }
+    _cleanupServingIfEmpty(oldSectionId, oldServing);
+    MenuEvents.emit("basket:changed", { reason: "clear" });
+  }
+
+  function reorderServings(fromN, toN, sectionId) {
+    var sid = sectionId || _activeSectionId;
+    var cur = _sectionServings[sid] || 1;
+    fromN = Math.max(1, Math.min(fromN, cur - 1));
+    toN   = Math.max(1, Math.min(toN,   cur - 1));
+    if (fromN === toN) return;
+    var TEMP = -1;
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving === fromN) l.serving = TEMP;
+    });
+    if (fromN > toN) {
+      _basket.forEach(function (l) {
+        if (l.sectionId === sid && l.serving >= toN && l.serving < fromN) l.serving += 1;
+      });
+    } else {
+      _basket.forEach(function (l) {
+        if (l.sectionId === sid && l.serving > fromN && l.serving <= toN) l.serving -= 1;
+      });
+    }
+    _basket.forEach(function (l) {
+      if (l.sectionId === sid && l.serving === TEMP) l.serving = toN;
+    });
     MenuEvents.emit("basket:changed", { reason: "clear" });
   }
 
@@ -573,6 +687,10 @@ var MenuCore = (function () {
     removeLine: removeLine,
     setLineNote: setLineNote,
     moveLineToSection: moveLineToSection,
+    mergeLines: mergeLines,
+    moveLine: moveLine,
+    moveLineToServing: moveLineToServing,
+    reorderServings: reorderServings,
     clearSection: clearSection,
     removeServing: removeServing,
     clearBasket: clearBasket,

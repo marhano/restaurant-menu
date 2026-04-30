@@ -746,6 +746,52 @@
 .rm-serving-line-actions .rm-serving-line-remove:hover { background: #fef2f2; color: var(--rm-danger); }
 .rm-serving-line-actions .rm-serving-line-edit:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
 
+/* ── Serving accordion drag handle ───────────────── */
+.rm-serving-acc-handle {
+  cursor: grab;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: var(--rm-surface-subtle);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+.rm-serving-acc-handle:hover { color: var(--rm-surface-muted); background: var(--rm-surface-dim); }
+.rm-serving-acc.rm-dragging { opacity: 0.35; }
+.rm-serving-acc.rm-acc-insert-before { box-shadow: 0 -2px 0 0 var(--rm-primary); }
+.rm-serving-acc.rm-acc-insert-after  { box-shadow: 0  2px 0 0 var(--rm-primary); }
+
+/* ── Drag and drop ────────────────────────────────── */
+.rm-basket-line, .rm-serving-line {
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.rm-basket-line.rm-dragging,
+.rm-serving-line.rm-dragging {
+  opacity: 0.35;
+}
+.rm-basket-line.rm-drag-over,
+.rm-serving-line.rm-drag-over {
+  outline: 2px solid var(--rm-primary);
+  outline-offset: -2px;
+  border-radius: 6px;
+  background: var(--rm-primary-soft);
+}
+.rm-serving-acc.rm-drag-over {
+  outline: 2px dashed var(--rm-primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.rm-basket-list.rm-drag-over {
+  outline: 2px dashed var(--rm-primary);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+
 /* ── Basket footer ────────────────────────────────── */
 .rm-basket-footer { border-top: 1px solid var(--rm-border); flex-shrink: 0; }
 .rm-basket-footer-inner {
