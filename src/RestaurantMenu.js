@@ -113,6 +113,7 @@ var RestaurantMenu = (function () {
       MenuCore.clearExistingOrder();
       _menuModalOpen = true;
       $menuOverlay.addClass("rm-menu-overlay--open");
+      jQuery("html").addClass("modal-shown");
       jQuery("body").css("overflow", "hidden");
       jQuery(document).on("keydown.rmmenumodal", function (e) {
         if (e.key === "Escape") closeMenuModal();
@@ -122,6 +123,7 @@ var RestaurantMenu = (function () {
       if (!cfg.modal || !_menuModalOpen) return;
       _menuModalOpen = false;
       $menuOverlay.removeClass("rm-menu-overlay--open");
+      jQuery("html").removeClass("modal-shown");
       jQuery("body").css("overflow", "");
       jQuery(document).off("keydown.rmmenumodal");
     }
@@ -246,6 +248,7 @@ var RestaurantMenu = (function () {
         jQuery(document).off("keydown.rmdrawer");
         jQuery(document).off("keydown.rmmenumodal");
         jQuery("body").css("overflow", "");
+        jQuery("html").removeClass("modal-shown");
         if ($menuOverlay) {
           $menuOverlay.remove();
           $menuOverlay = null;

@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-30T01:43:32.119Z
+ * Built: 2026-04-30T02:01:34.826Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -2600,6 +2600,7 @@ var RestaurantMenu = (function () {
       MenuCore.clearExistingOrder();
       _menuModalOpen = true;
       $menuOverlay.addClass("rm-menu-overlay--open");
+      jQuery("html").addClass("modal-shown");
       jQuery("body").css("overflow", "hidden");
       jQuery(document).on("keydown.rmmenumodal", function (e) {
         if (e.key === "Escape") closeMenuModal();
@@ -2609,6 +2610,7 @@ var RestaurantMenu = (function () {
       if (!cfg.modal || !_menuModalOpen) return;
       _menuModalOpen = false;
       $menuOverlay.removeClass("rm-menu-overlay--open");
+      jQuery("html").removeClass("modal-shown");
       jQuery("body").css("overflow", "");
       jQuery(document).off("keydown.rmmenumodal");
     }
@@ -2733,6 +2735,7 @@ var RestaurantMenu = (function () {
         jQuery(document).off("keydown.rmdrawer");
         jQuery(document).off("keydown.rmmenumodal");
         jQuery("body").css("overflow", "");
+        jQuery("html").removeClass("modal-shown");
         if ($menuOverlay) {
           $menuOverlay.remove();
           $menuOverlay = null;
