@@ -427,12 +427,49 @@
   box-shadow: 0 8px 24px rgba(10, 10, 10, 0.06);
 }
 .rm-item-card--pulse {
-  animation: rm-pulse 0.32s ease;
+  animation: rm-pulse 0.48s ease;
 }
 @keyframes rm-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rm-primary) 35%, transparent); }
-  100% { box-shadow: 0 0 0 12px transparent; }
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0   color-mix(in srgb, var(--rm-primary) 45%, transparent); }
+  30%  { transform: scale(1.04); box-shadow: 0 0 0 6px color-mix(in srgb, var(--rm-primary) 22%, transparent); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 14px transparent; }
 }
+
+/* FAB pop-bounce when item added */
+@keyframes rm-fab-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.28); }
+  60%  { transform: scale(0.88); }
+  80%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.rm-basket-fab--pop { animation: rm-fab-pop 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) !important; }
+
+/* Add-to-basket toast */
+.rm-add-toast {
+  position: fixed;
+  bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--rm-surface-alt, #0a0a0a);
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 100px;
+  font-size: 0.85rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 9px;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 6px 24px rgba(10,10,10,0.20);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  white-space: nowrap;
+  max-width: calc(100vw - 48px);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.rm-add-toast--show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.rm-add-toast i { color: #4ade80; flex-shrink: 0; }
 
 .rm-item-img {
   width: 100%; aspect-ratio: 4 / 3;

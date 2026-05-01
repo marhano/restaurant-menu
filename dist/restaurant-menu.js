@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-01T10:46:50.062Z
+ * Built: 2026-05-01T10:55:55.789Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -1317,6 +1317,7 @@ var MenuRender = (function () {
  */
 var MenuBrowse = (function () {
   var _$root = null;
+  var _toastTimer = null;
 
   function build($root) {
     _$root = $root;
@@ -1484,7 +1485,7 @@ var MenuBrowse = (function () {
       if (jQuery(e.target).closest("." + ns("item-ellipsis")).length) return;
       var id = jQuery(this).attr("data-item-id");
       var line = MenuCore.addItem(id);
-      if (line) _pulseCard(jQuery(this));
+      if (line) _pulseCard(jQuery(this), line.item);
     });
 
     // Ellipsis → popover to pick basket section
@@ -1532,10 +1533,28 @@ var MenuBrowse = (function () {
     jQuery(document).off("click.rmfilter");
   }
 
-  function _pulseCard($card) {
+  function _pulseCard($card, item) {
     var cls = MenuRender.ns("item-card--pulse");
+    $card.removeClass(cls);
+    void $card[0].offsetWidth; // force reflow so re-adding the class restarts the animation
     $card.addClass(cls);
-    setTimeout(function () { $card.removeClass(cls); }, 280);
+    setTimeout(function () { $card.removeClass(cls); }, 480);
+    _showAddToast(item);
+  }
+
+  function _showAddToast(item) {
+    var ns = MenuRender.ns;
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    jQuery("." + ns("add-toast")).remove();
+    var $toast = jQuery("<div>").addClass(ns("add-toast"))
+      .append(jQuery("<i>").addClass("fa-solid fa-check"))
+      .append(jQuery("<span>").text(item && item.name ? item.name : "Item added"));
+    jQuery("body").append($toast);
+    setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
+    _toastTimer = setTimeout(function () {
+      $toast.removeClass(ns("add-toast--show"));
+      setTimeout(function () { $toast.remove(); }, 260);
+    }, 2000);
   }
 
   function _showSectionPopover($anchor, itemId) {
@@ -1555,7 +1574,8 @@ var MenuBrowse = (function () {
     $pop.on("click", "." + MenuRender.ns("popover-opt"), function (e) {
       e.stopPropagation();
       var sid = jQuery(this).attr("data-section-id");
-      MenuCore.addItem(itemId, sid);
+      var line = MenuCore.addItem(itemId, sid);
+      if (line) _showAddToast(line.item);
       MenuCore.setActiveSection(sid);
       _closePopover();
     });
@@ -2610,8 +2630,17 @@ var RestaurantMenu = (function () {
     // Keep FAB count badge in sync with basket
     function _syncFab() {
       var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
-      $fab.find("." + MenuRender.ns("basket-fab-count")).text(count);
+      var $badge = $fab.find("." + MenuRender.ns("basket-fab-count"));
+      var prev = parseInt($badge.text(), 10) || 0;
+      $badge.text(count);
       $fab.toggleClass(MenuRender.ns("basket-fab--has-count"), count > 0);
+      if (count > prev) {
+        var popCls = MenuRender.ns("basket-fab--pop");
+        $fab.removeClass(popCls);
+        void $fab[0].offsetWidth;
+        $fab.addClass(popCls);
+        setTimeout(function () { $fab.removeClass(popCls); }, 420);
+      }
     }
     _syncFab();
     MenuEvents.on("basket:changed", _syncFab);

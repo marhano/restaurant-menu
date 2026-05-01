@@ -5,6 +5,7 @@
  */
 var MenuBrowse = (function () {
   var _$root = null;
+  var _toastTimer = null;
 
   function build($root) {
     _$root = $root;
@@ -172,7 +173,7 @@ var MenuBrowse = (function () {
       if (jQuery(e.target).closest("." + ns("item-ellipsis")).length) return;
       var id = jQuery(this).attr("data-item-id");
       var line = MenuCore.addItem(id);
-      if (line) _pulseCard(jQuery(this));
+      if (line) _pulseCard(jQuery(this), line.item);
     });
 
     // Ellipsis → popover to pick basket section
@@ -220,10 +221,28 @@ var MenuBrowse = (function () {
     jQuery(document).off("click.rmfilter");
   }
 
-  function _pulseCard($card) {
+  function _pulseCard($card, item) {
     var cls = MenuRender.ns("item-card--pulse");
+    $card.removeClass(cls);
+    void $card[0].offsetWidth; // force reflow so re-adding the class restarts the animation
     $card.addClass(cls);
-    setTimeout(function () { $card.removeClass(cls); }, 280);
+    setTimeout(function () { $card.removeClass(cls); }, 480);
+    _showAddToast(item);
+  }
+
+  function _showAddToast(item) {
+    var ns = MenuRender.ns;
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    jQuery("." + ns("add-toast")).remove();
+    var $toast = jQuery("<div>").addClass(ns("add-toast"))
+      .append(jQuery("<i>").addClass("fa-solid fa-check"))
+      .append(jQuery("<span>").text(item && item.name ? item.name : "Item added"));
+    jQuery("body").append($toast);
+    setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
+    _toastTimer = setTimeout(function () {
+      $toast.removeClass(ns("add-toast--show"));
+      setTimeout(function () { $toast.remove(); }, 260);
+    }, 2000);
   }
 
   function _showSectionPopover($anchor, itemId) {
@@ -243,7 +262,8 @@ var MenuBrowse = (function () {
     $pop.on("click", "." + MenuRender.ns("popover-opt"), function (e) {
       e.stopPropagation();
       var sid = jQuery(this).attr("data-section-id");
-      MenuCore.addItem(itemId, sid);
+      var line = MenuCore.addItem(itemId, sid);
+      if (line) _showAddToast(line.item);
       MenuCore.setActiveSection(sid);
       _closePopover();
     });

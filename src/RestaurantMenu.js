@@ -122,8 +122,17 @@ var RestaurantMenu = (function () {
     // Keep FAB count badge in sync with basket
     function _syncFab() {
       var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
-      $fab.find("." + MenuRender.ns("basket-fab-count")).text(count);
+      var $badge = $fab.find("." + MenuRender.ns("basket-fab-count"));
+      var prev = parseInt($badge.text(), 10) || 0;
+      $badge.text(count);
       $fab.toggleClass(MenuRender.ns("basket-fab--has-count"), count > 0);
+      if (count > prev) {
+        var popCls = MenuRender.ns("basket-fab--pop");
+        $fab.removeClass(popCls);
+        void $fab[0].offsetWidth;
+        $fab.addClass(popCls);
+        setTimeout(function () { $fab.removeClass(popCls); }, 420);
+      }
     }
     _syncFab();
     MenuEvents.on("basket:changed", _syncFab);
