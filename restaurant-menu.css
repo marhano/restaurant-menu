@@ -4,6 +4,22 @@
    Requires: restaurant-menu.js + jQuery 3+
    ============================================================ */
 
+/* Global token defaults — inherited by body-appended overlays/modals/popovers */
+:root {
+  --rm-primary:         #f05327;
+  --rm-primary-dark:    #d63d14;
+  --rm-primary-soft:    #fef2ed;
+  --rm-surface:         #ffffff;
+  --rm-surface-bright:  #fafafa;
+  --rm-surface-dim:     #f4f4f4;
+  --rm-surface-alt:     #0a0a0a;
+  --rm-surface-muted:   #737373;
+  --rm-surface-subtle:  #a3a3a3;
+  --rm-border:          #ededed;
+  --rm-border-strong:   #d4d4d4;
+  --rm-danger:          #ef4444;
+}
+
 /* Scoped reset */
 .rm-root *,
 .rm-root *::before,
@@ -57,6 +73,7 @@
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 16px;
   align-items: start;
+  padding-top: 1rem;
 }
 
 .rm-left {
@@ -164,54 +181,81 @@
   .rm-right { width: 92%; max-width: none; }
 }
 
-/* ── Table info (revamped) ───────────────── */
+/* ── Table info ──────────────────────────── */
 .rm-table-info {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 14px 22px;
-  padding: 16px 20px 16px 24px;
-  background: linear-gradient(135deg,
-    var(--rm-surface) 0%,
-    var(--rm-surface-bright) 100%);
-  border: 1px solid var(--rm-border);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 14px 22px;
+  background: var(--rm-surface, #ffffff);
+  border: 1px solid var(--rm-border, #ededed);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(10, 10, 10, 0.03);
   overflow: hidden;
+  color: var(--rm-surface-alt, #0a0a0a);
+  box-shadow: 0 1px 4px rgba(10,10,10,0.04);
 }
 .rm-table-info::before {
   content: "";
-  position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-  background: var(--rm-primary);
+  position: absolute; right: -24px; top: -32px;
+  width: 120px; height: 120px;
+  background: rgba(10,10,10,0.03);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.rm-table-info::after {
+  content: "";
+  position: absolute; left: 35%; bottom: -22px;
+  width: 80px; height: 80px;
+  background: rgba(10,10,10,0.02);
+  border-radius: 50%;
+  pointer-events: none;
 }
 .rm-table-cell {
-  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0; padding: 0 20px;
 }
+.rm-table-cell:first-child { padding-left: 0; }
+.rm-table-cell + .rm-table-cell { border-left: 1px solid var(--rm-border, #ededed); }
 .rm-table-cell-head {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.7px;
-  color: var(--rm-surface-subtle); font-weight: 700;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--rm-surface-subtle, #a3a3a3); font-weight: 700;
 }
-.rm-table-cell-head i { font-size: 0.7rem; color: var(--rm-primary); }
+.rm-table-cell-head i { font-size: 0.65rem; color: var(--rm-surface-muted, #737373); }
 .rm-table-label {
-  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.7px;
-  color: var(--rm-surface-subtle); font-weight: 700;
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--rm-surface-subtle, #a3a3a3); font-weight: 700;
 }
 .rm-table-value {
-  font-size: 0.98rem; font-weight: 600;
-  color: var(--rm-surface-alt); letter-spacing: -0.01em;
+  font-size: 1rem; font-weight: 700;
+  color: var(--rm-surface-alt, #0a0a0a); letter-spacing: -0.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rm-table-pill {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 10px; border-radius: 999px;
-  background: var(--rm-primary-soft); color: var(--rm-primary-dark);
-  font-size: 0.85rem; font-weight: 700; letter-spacing: -0.01em;
+  background: var(--rm-surface-dim, #f4f4f4);
+  color: var(--rm-surface-alt, #0a0a0a);
+  border: 1px solid var(--rm-border, #ededed);
+  font-size: 0.82rem; font-weight: 700; letter-spacing: -0.01em;
   align-self: flex-start;
 }
 .rm-table-none {
-  color: var(--rm-surface-muted); font-style: italic;
-  padding: 6px 2px;
+  color: var(--rm-surface-muted, #737373); font-style: italic; padding: 6px 2px;
+}
+.rm-table-info--empty {
+  background: var(--rm-surface-dim, #f4f4f4);
+  border: 1px dashed var(--rm-border-strong, #d4d4d4);
+  border-radius: 14px;
+}
+.rm-table-info--empty .rm-table-none {
+  color: var(--rm-surface-muted, #737373);
+}
+.rm-modal-topbar .rm-table-info--empty {
+  border-radius: 16px 16px 0 0;
+  border-left: none; border-right: none; border-top: none;
 }
 
 /* ── Search + filter row ────────────────── */
@@ -525,10 +569,10 @@
 }
 
 /* ── Global subtle scrollbar ──────────────────────── */
-.rm-root ::-webkit-scrollbar, .rm-root--modal::-webkit-scrollbar { width: 4px; height: 4px; }
-.rm-root ::-webkit-scrollbar-track, .rm-root--modal::-webkit-scrollbar-track { background: transparent; }
-.rm-root ::-webkit-scrollbar-thumb, .rm-root--modal::-webkit-scrollbar-thumb { background: var(--rm-border-strong) !important; border-radius: 999px; }
-.rm-root ::-webkit-scrollbar-thumb:hover, .rm-root--modal::-webkit-scrollbar-thumb:hover { background: var(--rm-surface-muted); }
+.rm-root ::-webkit-scrollbar, .rm-modal-content::-webkit-scrollbar { width: 4px; height: 4px; }
+.rm-root ::-webkit-scrollbar-track, .rm-modal-content::-webkit-scrollbar-track { background: transparent; }
+.rm-root ::-webkit-scrollbar-thumb, .rm-modal-content::-webkit-scrollbar-thumb { background: var(--rm-border-strong) !important; border-radius: 999px; }
+.rm-root ::-webkit-scrollbar-thumb:hover, .rm-modal-content::-webkit-scrollbar-thumb:hover { background: var(--rm-surface-muted); }
 .rm-root * { scrollbar-width: thin; scrollbar-color: var(--rm-border-strong) transparent; }
 .rm-basket-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -850,15 +894,63 @@
 }
 .rm-menu-overlay--open { display: flex; }
 
+/* ── Menu modal outer shell ─────────────── */
 .rm-root--modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 1200px;
   height: calc(100vh - 40px);
   background: var(--rm-surface-bright, #fafafa);
   border-radius: 16px;
   box-shadow: 0 32px 80px rgba(10, 10, 10, 0.28), 0 0 0 1px rgba(10, 10, 10, 0.06);
+  overflow: visible;
+}
+
+/* Non-scrolling topbar: table info + close button */
+.rm-modal-topbar {
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.rm-modal-topbar .rm-table-slot {
+  position: static;
+  background: transparent;
+  padding: 0;
+  z-index: auto;
+}
+.rm-modal-topbar .rm-table-info {
+  border-radius: 16px 16px 0 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Close button — sticks out above the modal */
+.rm-menu-modal-close {
+  position: absolute;
+  top: -16px; right: 16px;
+  width: 36px; height: 36px;
+  border: none; border-radius: 8px;
+  background: var(--rm-surface-alt, #0a0a0a);
+  color: #ffffff;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  z-index: 50;
+  box-shadow: 0 4px 14px rgba(10, 10, 10, 0.32);
+  transition: opacity 0.15s;
+}
+.rm-menu-modal-close:hover { opacity: 0.75; }
+
+/* Scrollable content below the topbar */
+.rm-modal-content {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 0 1rem 1rem 1rem;
+  padding: 0 1rem 1rem;
+  border-radius: 0 0 16px 16px;
+  background: var(--rm-surface-bright, #fafafa);
 }
 
 /* On desktop inside the modal: lock to 2-column, hide the drawer controls. */
@@ -870,9 +962,9 @@
   }
   .rm-root--modal .rm-right {
     position: sticky !important;
-    top: calc(-16px + var(--rm-table-slot-h, 96px)) !important;
+    top: 16px !important;
     height: auto !important;
-    max-height: calc(100vh - 40px - var(--rm-table-slot-h, 96px)) !important;
+    max-height: calc(100vh - 40px - var(--rm-modal-topbar-h, 72px) - 32px) !important;
     transform: none !important;
     box-shadow: none !important;
   }
@@ -887,21 +979,6 @@
   .rm-root--modal .rm-basket-close { display: none !important; }
 }
 /* On small screens inside the modal: normal drawer behaviour applies. */
-
-.rm-menu-modal-close {
-  position: absolute;
-  top: 12px; right: 12px;
-  width: 36px; height: 36px;
-  border: none; border-radius: 8px;
-  background: rgba(10, 10, 10, 0.06);
-  color: #737373;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1rem;
-  z-index: 10;
-  transition: background 0.15s, color 0.15s;
-}
-.rm-menu-modal-close:hover { background: rgba(10, 10, 10, 0.12); color: #0a0a0a; }
 
 /* ── Modal (item edit) ────────────────────────────── */
 .rm-overlay {

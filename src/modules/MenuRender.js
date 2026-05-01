@@ -29,6 +29,7 @@ var MenuRender = (function () {
   function buildTableInfo(table, labels) {
     var $wrap = jQuery("<div>").addClass(ns("table-info"));
     if (!table) {
+      $wrap.addClass(ns("table-info--empty"));
       $wrap.append(jQuery("<span>").addClass(ns("table-none")).text("No table selected"));
       return $wrap;
     }

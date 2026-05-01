@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-04-30T02:01:34.826Z
+ * Built: 2026-05-01T10:46:50.062Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -972,6 +972,7 @@ var MenuRender = (function () {
   function buildTableInfo(table, labels) {
     var $wrap = jQuery("<div>").addClass(ns("table-info"));
     if (!table) {
+      $wrap.addClass(ns("table-info--empty"));
       $wrap.append(jQuery("<span>").addClass(ns("table-none")).text("No table selected"));
       return $wrap;
     }
@@ -2525,36 +2526,58 @@ var RestaurantMenu = (function () {
 
     // ── Root element: either the container (default) or a modal box ───────
     var $root;
+    var $contentRoot;        // where $shell attaches — inner scroll wrapper in modal mode
+    var $modalTopbar = null; // non-scrolling topbar row (modal only)
     var $menuOverlay = null;
     var _menuModalOpen = false;
 
     if (cfg.modal) {
       $menuOverlay = jQuery("<div>").addClass("rm-menu-overlay");
       $root = jQuery("<div>").addClass("rm-root rm-root--modal");
-      $root.append(
+      $modalTopbar = jQuery("<div>").addClass("rm-modal-topbar");
+      $modalTopbar.append(
         jQuery("<button type='button'>").addClass("rm-menu-modal-close")
           .attr("aria-label", "Close")
           .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
           .on("click", function () { closeMenuModal(); })
       );
+      $root.append($modalTopbar);
+      var $modalContent = jQuery("<div>").addClass("rm-modal-content");
+      $root.append($modalContent);
+      $contentRoot = $modalContent;
       $menuOverlay.append($root);
       jQuery("body").append($menuOverlay);
       $container.empty();
     } else {
       $container.empty().addClass("rm-root");
       $root = $container;
+      $contentRoot = $root;
     }
 
     $root.toggleClass("rm-root--fancy", !!cfg.complexAnimations);
     jQuery.each(cfg.theme, function (key, val) {
-      $root[0].style.setProperty("--rm-" + camelToKebab(key), val);
+      var prop = "--rm-" + camelToKebab(key);
+      $root[0].style.setProperty(prop, val);
+      document.documentElement.style.setProperty(prop, val);
     });
 
     // Build DOM
     var $shell = MenuRender.buildShell();
-    $root.append($shell);
+    $contentRoot.append($shell);
     MenuBrowse.build($shell);
     MenuBasket.build($shell);
+
+    // In modal mode, lift the table slot out of the scroll container into the
+    // non-scrolling topbar so it's always visible regardless of scroll position.
+    var $slot = $shell.find("." + MenuRender.ns("table-slot"));
+    if (cfg.modal && $modalTopbar) {
+      $modalTopbar.prepend($slot);
+      // MenuBrowse._renderTableInfo searches inside $shell and won't find the moved
+      // slot, so we wire up the update here.
+      MenuEvents.on("table:changed", function () {
+        $slot.empty().append(MenuRender.buildTableInfo(MenuCore.getTable(), cfg.labels));
+      });
+    }
 
     // Floating basket toggle (tablet / small screens only — CSS-hidden on desktop)
     var $fab = MenuRender.buildBasketFab(cfg.labels);
@@ -2620,12 +2643,13 @@ var RestaurantMenu = (function () {
       });
     }
 
-    // ── Keep --rm-table-slot-h in sync so .rm-right top/max-height stay correct
-    var $slot = $shell.find("." + MenuRender.ns("table-slot"));
+    // ── Keep layout CSS vars in sync ─────────────────────────────────────────
     function _syncSlotHeight() {
       var h = $slot.outerHeight() || 0;
-      // Include the 16px gap between slot and body.
       $root[0].style.setProperty("--rm-table-slot-h", (h + 16) + "px");
+      if (cfg.modal && $modalTopbar) {
+        $root[0].style.setProperty("--rm-modal-topbar-h", ($modalTopbar.outerHeight() || 0) + "px");
+      }
     }
     _syncSlotHeight();
     var _slotRO = null;
@@ -2736,6 +2760,9 @@ var RestaurantMenu = (function () {
         jQuery(document).off("keydown.rmmenumodal");
         jQuery("body").css("overflow", "");
         jQuery("html").removeClass("modal-shown");
+        jQuery.each(cfg.theme, function (key) {
+          document.documentElement.style.removeProperty("--rm-" + camelToKebab(key));
+        });
         if ($menuOverlay) {
           $menuOverlay.remove();
           $menuOverlay = null;
