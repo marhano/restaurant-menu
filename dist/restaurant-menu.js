@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-02T04:22:34.607Z
+ * Built: 2026-05-02T09:35:46.892Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -2718,13 +2718,12 @@ var RestaurantMenu = (function () {
     $shell.on("click", "." + MenuRender.ns("basket-close"), closeBasket);
 
     // Keep FAB count badge in sync with basket
-    function _syncFab() {
+    function _syncFab(evt) {
       var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
       var $badge = $fab.find("." + MenuRender.ns("basket-fab-count"));
-      var prev = parseInt($badge.text(), 10) || 0;
       $badge.text(count);
       $fab.toggleClass(MenuRender.ns("basket-fab--has-count"), count > 0);
-      if (count > prev) {
+      if (evt && evt.reason === "add") {
         var popCls = MenuRender.ns("basket-fab--pop");
         $fab.removeClass(popCls);
         void $fab[0].offsetWidth;
