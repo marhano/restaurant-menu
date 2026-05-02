@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-02T09:35:46.892Z
+ * Built: 2026-05-02T09:45:26.895Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -2287,6 +2287,21 @@ var MenuBasket = (function () {
       var el = document.elementFromPoint(x, y);
       if (!el) return;
 
+      // Check accordion first — a serving line sitting inside an accordion must be
+      // treated as an accordion drop so the whole serving is searched for duplicates.
+      var $acc = jQuery(el).closest("." + ns("serving-acc"));
+      if ($acc.length) {
+        var n = parseInt($acc.attr("data-serving"), 10);
+        if (!isNaN(n)) {
+          var accSid = MenuCore.getActiveSectionId();
+          var accDup = _findDupInServing(savedLineId, accSid, n);
+          if (accDup) MenuCore.mergeLines(savedLineId, accDup.lineId);
+          else MenuCore.moveLineToServing(savedLineId, n, accSid);
+        }
+        return;
+      }
+
+      // Drop onto a line in the current basket-list (not inside any accordion)
       var $line = jQuery(el).closest(LINE_SEL);
       if ($line.length) {
         var toLineId = $line.attr("data-line-id");
@@ -2301,18 +2316,6 @@ var MenuBasket = (function () {
             if (fromLine.item.id === toLine.item.id) MenuCore.mergeLines(savedLineId, toLineId);
             else MenuCore.moveLine(savedLineId, toLineId);
           }
-        }
-        return;
-      }
-
-      var $acc = jQuery(el).closest("." + ns("serving-acc"));
-      if ($acc.length) {
-        var n = parseInt($acc.attr("data-serving"), 10);
-        if (!isNaN(n)) {
-          var accSid = MenuCore.getActiveSectionId();
-          var accDup = _findDupInServing(savedLineId, accSid, n);
-          if (accDup) MenuCore.mergeLines(savedLineId, accDup.lineId);
-          else MenuCore.moveLineToServing(savedLineId, n, accSid);
         }
         return;
       }
