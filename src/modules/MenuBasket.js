@@ -542,15 +542,39 @@ var MenuBasket = (function () {
       var $acc = jQuery(el).closest("." + ns("serving-acc"));
       if ($acc.length) {
         var n = parseInt($acc.attr("data-serving"), 10);
-        if (!isNaN(n)) MenuCore.moveLineToServing(savedLineId, n, MenuCore.getActiveSectionId());
+        if (!isNaN(n)) {
+          var accSid = MenuCore.getActiveSectionId();
+          var accDup = _findDupInServing(savedLineId, accSid, n);
+          if (accDup) MenuCore.mergeLines(savedLineId, accDup.lineId);
+          else MenuCore.moveLineToServing(savedLineId, n, accSid);
+        }
         return;
       }
 
       var $bl = jQuery(el).closest("." + ns("basket-list"));
       if ($bl.length) {
-        var sid = MenuCore.getActiveSectionId();
-        MenuCore.moveLineToServing(savedLineId, MenuCore.getServing(sid), sid);
+        var blSid = MenuCore.getActiveSectionId();
+        var blServing = MenuCore.getServing(blSid);
+        var blDup = _findDupInServing(savedLineId, blSid, blServing);
+        if (blDup) MenuCore.mergeLines(savedLineId, blDup.lineId);
+        else MenuCore.moveLineToServing(savedLineId, blServing, blSid);
       }
+    }
+
+    function _findDupInServing(lineId, sectionId, serving) {
+      var basket = MenuCore.getBasket();
+      var fromLine = null;
+      for (var i = 0; i < basket.length; i++) {
+        if (basket[i].lineId === lineId) { fromLine = basket[i]; break; }
+      }
+      if (!fromLine) return null;
+      for (var i = 0; i < basket.length; i++) {
+        var l = basket[i];
+        if (l.lineId !== lineId && l.sectionId === sectionId && l.serving === serving && l.item.id === fromLine.item.id) {
+          return l;
+        }
+      }
+      return null;
     }
 
     // ── Mouse / pen (Pointer Events, excludes touch) ──
