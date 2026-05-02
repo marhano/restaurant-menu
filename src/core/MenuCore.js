@@ -68,6 +68,15 @@ var MenuCore = (function () {
     MenuEvents.emit("menu:changed", { reason: "items" });
   }
 
+  function updateItemImage(itemId, src) {
+    if (!_cfg) return;
+    var item = getItemById(itemId);
+    if (!item) return;
+    item.image = src || "";
+    _basket.forEach(function (l) { if (l.item.id === itemId) l.item.image = src || ""; });
+    MenuEvents.emit("item:imageUpdated", { itemId: itemId, src: src });
+  }
+
   function setCategories(cats) {
     if (!_cfg) return;
     _cfg.categories = Array.isArray(cats) ? cats.map(MenuConfig.normalizeCategory) : [];
@@ -639,6 +648,7 @@ var MenuCore = (function () {
 
     // Live updates
     setItems: setItems,
+    updateItemImage: updateItemImage,
     setCategories: setCategories,
     setBasketSections: setBasketSections,
     startNewOrder: startNewOrder,

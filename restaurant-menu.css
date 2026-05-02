@@ -480,6 +480,54 @@
 .rm-item-img img { width: 100%; height: 100%; object-fit: cover; }
 .rm-item-img-placeholder { font-size: 2rem; color: var(--rm-surface-subtle); }
 
+/* ── Image update button ──────────────────────────── */
+.rm-item-img-update {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(10,10,10,0.55); border: none;
+  color: #fff; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0;
+  transition: opacity 0.18s, background 0.18s;
+}
+.rm-item-card:hover .rm-item-img-update { opacity: 1; }
+.rm-item-img-update:hover { background: var(--rm-primary); }
+
+/* overlay + spinner shown when rm-item-img--loading is set */
+.rm-item-img-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,10,10,0.45);
+  border-radius: inherit;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s;
+}
+.rm-item-img--loading .rm-item-img-update { opacity: 0; pointer-events: none; }
+.rm-item-img--loading .rm-item-img-overlay { opacity: 1; pointer-events: auto; }
+
+.rm-item-img-spinner {
+  width: 34px; height: 34px;
+  animation: rm-spin 1.2s linear infinite;
+  transform-origin: center;
+}
+.rm-item-img-spinner svg { width: 100%; height: 100%; display: block; }
+.rm-spinner-track { stroke: rgba(255,255,255,0.25); }
+.rm-spinner-arc {
+  stroke: #fff; stroke-linecap: round;
+  stroke-dasharray: 0 88;
+  animation: rm-spinner-fill 1.2s ease-in-out infinite;
+}
+
+@keyframes rm-spin {
+  from { transform: rotate(-90deg); }
+  to   { transform: rotate(270deg); }
+}
+@keyframes rm-spinner-fill {
+  0%   { stroke-dasharray:  0 88; }
+  50%  { stroke-dasharray: 66 22; }
+  100% { stroke-dasharray:  0 88; }
+}
+
 .rm-item-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .rm-item-name { font-weight: 600; font-size: 0.95rem; color: var(--rm-surface-alt); letter-spacing: -0.01em; }
 .rm-item-desc {

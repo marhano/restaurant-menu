@@ -176,6 +176,43 @@ var MenuBrowse = (function () {
       if (line) _pulseCard(jQuery(this), line.item);
     });
 
+    // Image update button → trigger onImageUpdate callback
+    _$root.on("click", "." + ns("item-img-update"), function (e) {
+      e.stopPropagation();
+      var cfg = MenuCore.getConfig();
+      if (typeof cfg.onImageUpdate !== "function") return;
+      var $btn = jQuery(this);
+      var $card = $btn.closest("." + ns("item-card"));
+      var itemId = $card.attr("data-item-id");
+      var $imgBox = $card.find("." + ns("item-img"));
+      if ($imgBox.hasClass(ns("item-img--loading"))) return;
+
+      $imgBox.addClass(ns("item-img--loading"));
+      cfg.onImageUpdate(itemId, function (src) {
+        if (!src) {
+          $imgBox.removeClass(ns("item-img--loading"));
+          return;
+        }
+        var img = new Image();
+        img.onload = function () {
+          var $existing = $imgBox.find("img");
+          if ($existing.length) {
+            $existing.attr("src", src);
+          } else {
+            $imgBox.find("." + ns("item-img-placeholder")).replaceWith(
+              jQuery("<img>").attr({ src: src, alt: "" })
+            );
+          }
+          $imgBox.removeClass(ns("item-img--loading"));
+          MenuCore.updateItemImage(itemId, src);
+        };
+        img.onerror = function () {
+          $imgBox.removeClass(ns("item-img--loading"));
+        };
+        img.src = src;
+      });
+    });
+
     // Ellipsis → popover to pick basket section
     _$root.on("click", "." + ns("item-ellipsis"), function (e) {
       e.stopPropagation();

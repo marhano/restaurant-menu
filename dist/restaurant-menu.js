@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-01T11:04:09.342Z
+ * Built: 2026-05-02T04:22:34.607Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -54,6 +54,7 @@ var MenuConfig = (function () {
     showImages: true,
     showDescriptions: true,
     showEllipsis: true, // per-item "…" menu to choose basket section
+    showImageUpdate: false, // per-item button to replace the card image
     showSendOrderButton: true,
     showNextServingButton: true,
     showTotals: true,
@@ -133,6 +134,7 @@ var MenuConfig = (function () {
     onNextServing: null, // (basket)  -> should return new serving number or promise
     onSendOrder: null, // (order, done) order={ table, basket, serving }
     onTableChange: null, // (table)
+    onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
   };
 
   // Accept either PascalCase (C# serialized) or camelCase for the same property.
@@ -299,6 +301,15 @@ var MenuCore = (function () {
     if (!_cfg) return;
     _cfg.items = Array.isArray(items) ? items.map(MenuConfig.normalizeItem) : [];
     MenuEvents.emit("menu:changed", { reason: "items" });
+  }
+
+  function updateItemImage(itemId, src) {
+    if (!_cfg) return;
+    var item = getItemById(itemId);
+    if (!item) return;
+    item.image = src || "";
+    _basket.forEach(function (l) { if (l.item.id === itemId) l.item.image = src || ""; });
+    MenuEvents.emit("item:imageUpdated", { itemId: itemId, src: src });
   }
 
   function setCategories(cats) {
@@ -872,6 +883,7 @@ var MenuCore = (function () {
 
     // Live updates
     setItems: setItems,
+    updateItemImage: updateItemImage,
     setCategories: setCategories,
     setBasketSections: setBasketSections,
     startNewOrder: startNewOrder,
@@ -1151,6 +1163,22 @@ var MenuRender = (function () {
       } else {
         $imgBox.append(jQuery("<i>").addClass("fa-solid fa-utensils " + ns("item-img-placeholder")));
       }
+      if (cfg.showImageUpdate) {
+        $imgBox.append(
+          jQuery("<button type='button'>").addClass(ns("item-img-update"))
+            .attr("title", "Update image")
+            .append(jQuery("<i>").addClass("fa-solid fa-download"))
+        );
+        $imgBox.append(
+          jQuery("<div>").addClass(ns("item-img-overlay")).append(
+            jQuery("<div>").addClass(ns("item-img-spinner"))
+              .html('<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">'
+                + '<circle class="' + ns("spinner-track") + '" cx="18" cy="18" r="14" fill="none" stroke-width="3"/>'
+                + '<circle class="' + ns("spinner-arc") + '" cx="18" cy="18" r="14" fill="none" stroke-width="3"/>'
+                + '</svg>')
+          )
+        );
+      }
       $card.append($imgBox);
     }
 
@@ -1296,6 +1324,7 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
+    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,
@@ -1486,6 +1515,43 @@ var MenuBrowse = (function () {
       var id = jQuery(this).attr("data-item-id");
       var line = MenuCore.addItem(id);
       if (line) _pulseCard(jQuery(this), line.item);
+    });
+
+    // Image update button → trigger onImageUpdate callback
+    _$root.on("click", "." + ns("item-img-update"), function (e) {
+      e.stopPropagation();
+      var cfg = MenuCore.getConfig();
+      if (typeof cfg.onImageUpdate !== "function") return;
+      var $btn = jQuery(this);
+      var $card = $btn.closest("." + ns("item-card"));
+      var itemId = $card.attr("data-item-id");
+      var $imgBox = $card.find("." + ns("item-img"));
+      if ($imgBox.hasClass(ns("item-img--loading"))) return;
+
+      $imgBox.addClass(ns("item-img--loading"));
+      cfg.onImageUpdate(itemId, function (src) {
+        if (!src) {
+          $imgBox.removeClass(ns("item-img--loading"));
+          return;
+        }
+        var img = new Image();
+        img.onload = function () {
+          var $existing = $imgBox.find("img");
+          if ($existing.length) {
+            $existing.attr("src", src);
+          } else {
+            $imgBox.find("." + ns("item-img-placeholder")).replaceWith(
+              jQuery("<img>").attr({ src: src, alt: "" })
+            );
+          }
+          $imgBox.removeClass(ns("item-img--loading"));
+          MenuCore.updateItemImage(itemId, src);
+        };
+        img.onerror = function () {
+          $imgBox.removeClass(ns("item-img--loading"));
+        };
+        img.src = src;
+      });
     });
 
     // Ellipsis → popover to pick basket section

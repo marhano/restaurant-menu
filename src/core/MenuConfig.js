@@ -45,6 +45,7 @@ var MenuConfig = (function () {
     showImages: true,
     showDescriptions: true,
     showEllipsis: true, // per-item "…" menu to choose basket section
+    showImageUpdate: false, // per-item button to replace the card image
     showSendOrderButton: true,
     showNextServingButton: true,
     showTotals: true,
@@ -124,6 +125,7 @@ var MenuConfig = (function () {
     onNextServing: null, // (basket)  -> should return new serving number or promise
     onSendOrder: null, // (order, done) order={ table, basket, serving }
     onTableChange: null, // (table)
+    onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
   };
 
   // Accept either PascalCase (C# serialized) or camelCase for the same property.

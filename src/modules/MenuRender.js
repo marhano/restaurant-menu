@@ -208,6 +208,22 @@ var MenuRender = (function () {
       } else {
         $imgBox.append(jQuery("<i>").addClass("fa-solid fa-utensils " + ns("item-img-placeholder")));
       }
+      if (cfg.showImageUpdate) {
+        $imgBox.append(
+          jQuery("<button type='button'>").addClass(ns("item-img-update"))
+            .attr("title", "Update image")
+            .append(jQuery("<i>").addClass("fa-solid fa-download"))
+        );
+        $imgBox.append(
+          jQuery("<div>").addClass(ns("item-img-overlay")).append(
+            jQuery("<div>").addClass(ns("item-img-spinner"))
+              .html('<svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">'
+                + '<circle class="' + ns("spinner-track") + '" cx="18" cy="18" r="14" fill="none" stroke-width="3"/>'
+                + '<circle class="' + ns("spinner-arc") + '" cx="18" cy="18" r="14" fill="none" stroke-width="3"/>'
+                + '</svg>')
+          )
+        );
+      }
       $card.append($imgBox);
     }
 
@@ -353,6 +369,7 @@ var MenuRender = (function () {
     buildSearchRow: buildSearchRow,
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
+    buildSubcategoryNavTabs: buildSubcategoryNavTabs,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,
