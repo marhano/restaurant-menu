@@ -680,10 +680,42 @@
 .rm-basket-line-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rm-basket-line-name  { font-weight: 600; font-size: 0.88rem; color: var(--rm-surface-alt); letter-spacing: -0.01em; }
 .rm-basket-line-price { font-size: 0.76rem; color: var(--rm-surface-muted); }
-.rm-basket-line-note  {
-  display: flex; align-items: center; gap: 5px;
+.rm-basket-line-note {
+  display: flex; align-items: flex-start; gap: 5px;
   font-size: 0.74rem; color: var(--rm-primary);
-  font-style: italic;
+  font-style: italic; margin-top: 3px;
+}
+.rm-note-lines {
+  flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.rm-note-line {
+  display: block;
+  padding: 1px 6px;
+  border-left: 2px solid currentColor;
+  border-radius: 0 3px 3px 0;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Extra lines hidden until expanded */
+.rm-note-line--extra { display: none; }
+.rm-basket-line-note--expanded .rm-note-line--extra { display: block; }
+.rm-basket-line-note--expanded .rm-note-line {
+  white-space: normal; overflow: visible; text-overflow: unset;
+  overflow-wrap: break-word; word-break: break-all;
+}
+
+.rm-note-toggle {
+  flex-shrink: 0; align-self: flex-start;
+  font-size: 0.66rem; font-style: normal; font-weight: 600;
+  padding: 1px 5px; border-radius: 99px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--rm-primary); cursor: pointer; line-height: 1.5;
+  transition: background 0.15s;
+}
+.rm-note-toggle:hover {
+  background: color-mix(in srgb, currentColor 20%, transparent);
 }
 .rm-basket-line-total {
   font-weight: 700; color: var(--rm-surface-alt); font-size: 0.88rem;
@@ -1098,6 +1130,39 @@
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   width: 100%; resize: vertical;
 }
+
+/* ── Note multi-input ─────────────────────────────── */
+.rm-note-inputs { display: flex; flex-direction: column; gap: 6px; }
+.rm-note-input-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.rm-note-input-row .rm-field-input {
+  flex: 1; resize: none; padding: 8px 10px;
+}
+.rm-note-remove-line {
+  flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--rm-border);
+  background: var(--rm-surface-dim); color: var(--rm-surface-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.rm-note-remove-line:hover { background: var(--rm-danger); border-color: var(--rm-danger); color: #fff; }
+.rm-note-add-line {
+  align-self: flex-start; margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 6px;
+  border: 1px dashed var(--rm-border-strong);
+  background: transparent; color: var(--rm-surface-muted);
+  font: inherit; font-size: 0.78rem; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.rm-note-add-line:not(:disabled):hover {
+  border-color: var(--rm-primary); color: var(--rm-primary);
+  background: var(--rm-primary-soft);
+}
+.rm-note-add-line:disabled { opacity: 0.4; cursor: not-allowed; }
 .rm-field-input:hover { border-color: var(--rm-border-strong); }
 .rm-field-input:focus {
   border-color: var(--rm-primary); background: #fff;

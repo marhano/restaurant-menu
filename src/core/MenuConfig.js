@@ -25,7 +25,7 @@ var MenuConfig = (function () {
 
     // Currency formatter
     currency: {
-      symbol: "$",
+      symbol: "₱",
       position: "prefix", // prefix | suffix
       decimals: 2,
     },

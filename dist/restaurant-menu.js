@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-02T09:45:26.895Z
+ * Built: 2026-05-06T03:50:07.091Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -34,7 +34,7 @@ var MenuConfig = (function () {
 
     // Currency formatter
     currency: {
-      symbol: "$",
+      symbol: "₱",
       position: "prefix", // prefix | suffix
       decimals: 2,
     },
@@ -1218,11 +1218,7 @@ var MenuRender = (function () {
     $main.append(jQuery("<div>").addClass(ns("existing-order-line-name")).text(line.item.name || ""));
     $main.append(jQuery("<div>").addClass(ns("existing-order-line-price")).text(priceText));
     if (line.note) {
-      $main.append(
-        jQuery("<div>").addClass(ns("basket-line-note"))
-          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-          .append(jQuery("<span>").text(line.note))
-      );
+      $main.append(buildNoteDisplay(line.note));
     }
     $row.append($main);
     $row.append(jQuery("<div>").addClass(ns("existing-order-line-qty")).text("\xD7" + line.qty));
@@ -1248,11 +1244,7 @@ var MenuRender = (function () {
     $main.append(jQuery("<div>").addClass(ns("basket-line-name")).text(line.item.name || ""));
     $main.append(jQuery("<div>").addClass(ns("basket-line-price")).text(priceText));
     if (line.note) {
-      $main.append(
-        jQuery("<div>").addClass(ns("basket-line-note"))
-          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-          .append(jQuery("<span>").text(line.note))
-      );
+      $main.append(buildNoteDisplay(line.note));
     }
     $row.append($main);
 
@@ -1316,6 +1308,46 @@ var MenuRender = (function () {
     return $f;
   }
 
+  // ── Note display ──────────────────────────────────
+  function buildNoteDisplay(note) {
+    var lines = (note || "").split("\n").filter(function (l) { return l.trim() !== ""; });
+    var $wrap = jQuery("<div>").addClass(ns("basket-line-note"));
+
+    if (lines.length <= 1) {
+      if (lines[0]) {
+        var $single = jQuery("<div>").addClass(ns("note-lines"));
+        $single.append(jQuery("<span>").addClass(ns("note-line")).text(lines[0]));
+        $wrap.append($single);
+      }
+      return $wrap;
+    }
+
+    // Multi-line: always show first line; collapse the rest behind a toggle badge
+    $wrap.addClass(ns("basket-line-note--multi"));
+    var $list = jQuery("<div>").addClass(ns("note-lines"));
+    lines.forEach(function (l, i) {
+      $list.append(
+        jQuery("<span>")
+          .addClass(ns("note-line") + (i > 0 ? " " + ns("note-line--extra") : ""))
+          .text(l)
+      );
+    });
+
+    var extra = lines.length - 1;
+    var $toggle = jQuery("<button type='button'>").addClass(ns("note-toggle"))
+      .text("+" + extra);
+
+    $toggle.on("click", function (e) {
+      e.stopPropagation();
+      var expanded = $wrap.hasClass(ns("basket-line-note--expanded"));
+      $wrap.toggleClass(ns("basket-line-note--expanded"), !expanded);
+      $toggle.text(expanded ? "+" + extra : "−");
+    });
+
+    $wrap.append($list, $toggle);
+    return $wrap;
+  }
+
   return {
     ns: ns,
     buildShell: buildShell,
@@ -1333,7 +1365,8 @@ var MenuRender = (function () {
     buildBasketLine: buildBasketLine,
     buildEmptyBasket: buildEmptyBasket,
     buildBasketFooter: buildBasketFooter,
-    buildExistingOrderLine: buildExistingOrderLine
+    buildExistingOrderLine: buildExistingOrderLine,
+    buildNoteDisplay: buildNoteDisplay
   };
 })();
 
@@ -1695,6 +1728,8 @@ var MenuBrowse = (function () {
  */
 var MenuEditLine = (function () {
 
+  var MAX_LINE_LEN = 50;
+
   function open(line) {
     var cfg = MenuCore.getConfig();
     var ns = MenuRender.ns;
@@ -1709,20 +1744,67 @@ var MenuEditLine = (function () {
       )
     );
 
-    // Note field
-    var $note = jQuery("<textarea>").addClass(ns("field-input"))
-      .attr("rows", 3)
-      .attr("placeholder", cfg.labels.addNote)
-      .val(line.note || "");
+    // ── Note field — dynamic input lines ──────────────
+    var existingLines = (line.note || "").split("\n").filter(function (l) { return l.trim() !== ""; });
+    if (!existingLines.length) existingLines = [""];
+
+    var $noteInputs = jQuery("<div>").addClass(ns("note-inputs"));
+
+    var $addLine = jQuery("<button type='button'>")
+      .addClass(ns("note-add-line"))
+      .append(jQuery("<i>").addClass("fa-solid fa-plus"))
+      .append(jQuery("<span>").text("Add line"));
+
+    function syncControls() {
+      var $rows = $noteInputs.find("." + ns("note-input-row"));
+      var multi = $rows.length > 1;
+      $rows.find("." + ns("note-remove-line")).toggle(multi);
+      var lastVal = $rows.last().find("input").val().trim();
+      $addLine.prop("disabled", !lastVal);
+    }
+
+    function addInputRow(val) {
+      var $row = jQuery("<div>").addClass(ns("note-input-row"));
+      var $input = jQuery("<input type='text'>")
+        .addClass(ns("field-input"))
+        .attr("maxlength", MAX_LINE_LEN)
+        .attr("placeholder", cfg.labels.addNote || "Add note…")
+        .val(val || "");
+      var $remove = jQuery("<button type='button'>")
+        .addClass(ns("note-remove-line"))
+        .attr("title", "Remove line")
+        .append(jQuery("<i>").addClass("fa-solid fa-xmark"));
+
+      $row.append($input, $remove);
+      $noteInputs.append($row);
+
+      $input.on("input", syncControls);
+      $remove.on("click", function () {
+        $row.remove();
+        syncControls();
+      });
+      syncControls();
+    }
+
+    existingLines.forEach(function (l) { addInputRow(l); });
+
+    $addLine.on("click", function () {
+      var $last = $noteInputs.find("." + ns("note-input-row")).last();
+      if (!$last.find("input").val().trim()) return;
+      addInputRow("");
+      $noteInputs.find("input").last().trigger("focus");
+      syncControls();
+    });
 
     $modal.append(
       jQuery("<div>").addClass(ns("field")).append(
         jQuery("<label>").text(cfg.labels.note),
-        $note
+        $noteInputs,
+        $addLine
       )
     );
 
-    // Section selector
+    // ── Section selector ───────────────────────────────
     var $sel = jQuery("<select>").addClass(ns("field-input"));
     MenuCore.getBasketSections().forEach(function (s) {
       $sel.append(jQuery("<option>").attr("value", s.id).text(s.label || s.id));
@@ -1743,7 +1825,7 @@ var MenuEditLine = (function () {
     $overlay.append($modal);
     jQuery("body").append($overlay);
 
-    setTimeout(function () { $note.trigger("focus"); }, 30);
+    setTimeout(function () { $noteInputs.find("input").first().trigger("focus"); }, 30);
 
     function close() { $overlay.remove(); }
 
@@ -1751,7 +1833,11 @@ var MenuEditLine = (function () {
     $overlay.on("click", function (e) { if (jQuery(e.target).is($overlay)) close(); });
 
     $save.on("click", function () {
-      var newNote = jQuery.trim($note.val());
+      var newNote = $noteInputs.find("input")
+        .map(function () { return jQuery.trim(jQuery(this).val()); })
+        .get()
+        .filter(function (v) { return v !== ""; })
+        .join("\n");
       var newSection = $sel.val();
       if (newNote !== (line.note || "")) MenuCore.setLineNote(line.lineId, newNote);
       if (newSection !== line.sectionId) MenuCore.moveLineToSection(line.lineId, newSection);
@@ -1917,7 +2003,6 @@ var MenuBasket = (function () {
 
       // Toggle button
       var $toggle = jQuery("<button type='button'>").addClass(ns("serving-acc-toggle"));
-      $toggle.append(jQuery("<span>").addClass(ns("serving-acc-num")).text(sg.serving));
       $toggle.append(jQuery("<span>").addClass(ns("serving-acc-label")).text("Serving " + sg.serving));
       $toggle.append(jQuery("<span>").addClass(ns("serving-acc-count")).text(count + " item" + (count !== 1 ? "s" : "")));
       if (cfg.showTotals !== false) {
@@ -1949,11 +2034,7 @@ var MenuBasket = (function () {
         $main.append(jQuery("<div>").addClass(ns("serving-line-name")).text(l.item.name || ""));
         $main.append(jQuery("<div>").addClass(ns("serving-line-price")).text(price));
         if (l.note) {
-          $main.append(
-            jQuery("<div>").addClass(ns("basket-line-note"))
-              .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-              .append(jQuery("<span>").text(l.note))
-          );
+          $main.append(MenuRender.buildNoteDisplay(l.note));
         }
         $row.append($main);
 
@@ -2076,15 +2157,9 @@ var MenuBasket = (function () {
       var $main = $existing.find("." + ns("basket-line-main"));
       var $note = $main.find("." + ns("basket-line-note"));
       if (line.note) {
-        if ($note.length) {
-          $note.find("span").text(line.note);
-        } else {
-          $main.append(
-            jQuery("<div>").addClass(ns("basket-line-note"))
-              .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-              .append(jQuery("<span>").text(line.note))
-          );
-        }
+        var $newNote = MenuRender.buildNoteDisplay(line.note);
+        if ($note.length) $note.replaceWith($newNote);
+        else $main.append($newNote);
       } else if ($note.length) {
         $note.remove();
       }

@@ -263,11 +263,7 @@ var MenuRender = (function () {
     $main.append(jQuery("<div>").addClass(ns("existing-order-line-name")).text(line.item.name || ""));
     $main.append(jQuery("<div>").addClass(ns("existing-order-line-price")).text(priceText));
     if (line.note) {
-      $main.append(
-        jQuery("<div>").addClass(ns("basket-line-note"))
-          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-          .append(jQuery("<span>").text(line.note))
-      );
+      $main.append(buildNoteDisplay(line.note));
     }
     $row.append($main);
     $row.append(jQuery("<div>").addClass(ns("existing-order-line-qty")).text("\xD7" + line.qty));
@@ -293,11 +289,7 @@ var MenuRender = (function () {
     $main.append(jQuery("<div>").addClass(ns("basket-line-name")).text(line.item.name || ""));
     $main.append(jQuery("<div>").addClass(ns("basket-line-price")).text(priceText));
     if (line.note) {
-      $main.append(
-        jQuery("<div>").addClass(ns("basket-line-note"))
-          .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-          .append(jQuery("<span>").text(line.note))
-      );
+      $main.append(buildNoteDisplay(line.note));
     }
     $row.append($main);
 
@@ -361,6 +353,46 @@ var MenuRender = (function () {
     return $f;
   }
 
+  // ── Note display ──────────────────────────────────
+  function buildNoteDisplay(note) {
+    var lines = (note || "").split("\n").filter(function (l) { return l.trim() !== ""; });
+    var $wrap = jQuery("<div>").addClass(ns("basket-line-note"));
+
+    if (lines.length <= 1) {
+      if (lines[0]) {
+        var $single = jQuery("<div>").addClass(ns("note-lines"));
+        $single.append(jQuery("<span>").addClass(ns("note-line")).text(lines[0]));
+        $wrap.append($single);
+      }
+      return $wrap;
+    }
+
+    // Multi-line: always show first line; collapse the rest behind a toggle badge
+    $wrap.addClass(ns("basket-line-note--multi"));
+    var $list = jQuery("<div>").addClass(ns("note-lines"));
+    lines.forEach(function (l, i) {
+      $list.append(
+        jQuery("<span>")
+          .addClass(ns("note-line") + (i > 0 ? " " + ns("note-line--extra") : ""))
+          .text(l)
+      );
+    });
+
+    var extra = lines.length - 1;
+    var $toggle = jQuery("<button type='button'>").addClass(ns("note-toggle"))
+      .text("+" + extra);
+
+    $toggle.on("click", function (e) {
+      e.stopPropagation();
+      var expanded = $wrap.hasClass(ns("basket-line-note--expanded"));
+      $wrap.toggleClass(ns("basket-line-note--expanded"), !expanded);
+      $toggle.text(expanded ? "+" + extra : "−");
+    });
+
+    $wrap.append($list, $toggle);
+    return $wrap;
+  }
+
   return {
     ns: ns,
     buildShell: buildShell,
@@ -378,6 +410,7 @@ var MenuRender = (function () {
     buildBasketLine: buildBasketLine,
     buildEmptyBasket: buildEmptyBasket,
     buildBasketFooter: buildBasketFooter,
-    buildExistingOrderLine: buildExistingOrderLine
+    buildExistingOrderLine: buildExistingOrderLine,
+    buildNoteDisplay: buildNoteDisplay
   };
 })();

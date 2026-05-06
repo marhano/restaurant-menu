@@ -151,7 +151,6 @@ var MenuBasket = (function () {
 
       // Toggle button
       var $toggle = jQuery("<button type='button'>").addClass(ns("serving-acc-toggle"));
-      $toggle.append(jQuery("<span>").addClass(ns("serving-acc-num")).text(sg.serving));
       $toggle.append(jQuery("<span>").addClass(ns("serving-acc-label")).text("Serving " + sg.serving));
       $toggle.append(jQuery("<span>").addClass(ns("serving-acc-count")).text(count + " item" + (count !== 1 ? "s" : "")));
       if (cfg.showTotals !== false) {
@@ -183,11 +182,7 @@ var MenuBasket = (function () {
         $main.append(jQuery("<div>").addClass(ns("serving-line-name")).text(l.item.name || ""));
         $main.append(jQuery("<div>").addClass(ns("serving-line-price")).text(price));
         if (l.note) {
-          $main.append(
-            jQuery("<div>").addClass(ns("basket-line-note"))
-              .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-              .append(jQuery("<span>").text(l.note))
-          );
+          $main.append(MenuRender.buildNoteDisplay(l.note));
         }
         $row.append($main);
 
@@ -310,15 +305,9 @@ var MenuBasket = (function () {
       var $main = $existing.find("." + ns("basket-line-main"));
       var $note = $main.find("." + ns("basket-line-note"));
       if (line.note) {
-        if ($note.length) {
-          $note.find("span").text(line.note);
-        } else {
-          $main.append(
-            jQuery("<div>").addClass(ns("basket-line-note"))
-              .append(jQuery("<i>").addClass("fa-solid fa-pen-to-square"))
-              .append(jQuery("<span>").text(line.note))
-          );
-        }
+        var $newNote = MenuRender.buildNoteDisplay(line.note);
+        if ($note.length) $note.replaceWith($newNote);
+        else $main.append($newNote);
       } else if ($note.length) {
         $note.remove();
       }
