@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-06T03:50:07.091Z
+ * Built: 2026-05-06T04:05:42.172Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -674,6 +674,15 @@ var MenuCore = (function () {
     }
   }
 
+  function clearSectionAll(sectionId) {
+    var before = _basket.length;
+    _basket = _basket.filter(function (l) { return l.sectionId !== sectionId; });
+    _sectionServings[sectionId] = 1;
+    if (_basket.length !== before) {
+      MenuEvents.emit("basket:changed", { reason: "clear" });
+    }
+  }
+
   /**
    * Remove a completed serving for a section and renumber remaining ones.
    * If serving 1 of 3 is removed: [1,2,3] → [1,2] (former 2→1, former 3→2).
@@ -937,6 +946,7 @@ var MenuCore = (function () {
     moveLineToServing: moveLineToServing,
     reorderServings: reorderServings,
     clearSection: clearSection,
+    clearSectionAll: clearSectionAll,
     removeServing: removeServing,
     clearBasket: clearBasket,
 
@@ -1930,16 +1940,19 @@ var MenuBasket = (function () {
     var $h = _$root.find("." + ns("basket-header")).empty();
     $h.append(jQuery("<i>").addClass("fa-solid fa-basket-shopping"));
     $h.append(jQuery("<span>").addClass(ns("basket-title")).text("Order"));
-    var count = MenuCore.getCurrentBasket().reduce(function (s, l) { return s + l.qty; }, 0);
+    var count = MenuCore.getBasket().reduce(function (s, l) { return s + l.qty; }, 0);
     if (count) $h.append(jQuery("<span>").addClass(ns("basket-count")).text(count));
 
-    var sectionCount = MenuCore.getBasketBySection(MenuCore.getActiveSectionId()).reduce(function (s, l) { return s + l.qty; }, 0);
+    var activeSid = MenuCore.getActiveSectionId();
+    var sectionCount = MenuCore.getBasket().filter(function (l) {
+      return l.sectionId === activeSid;
+    }).reduce(function (s, l) { return s + l.qty; }, 0);
     if (sectionCount) {
       $h.append(
         jQuery("<button type='button'>").addClass(ns("basket-clear-section"))
           .attr("title", "Remove all from this section")
           .append(jQuery("<i>").addClass("fa-solid fa-trash-can"))
-          .append(jQuery("<span>").text("Remove all"))
+          .append(jQuery("<span>").text("Remove all (" + sectionCount + ")"))
       );
     }
 
@@ -1954,9 +1967,10 @@ var MenuBasket = (function () {
   function _renderTabs() {
     var $t = _$root.find("." + MenuRender.ns("basket-tabs")).empty();
     var active = MenuCore.getActiveSectionId();
+    var allLines = MenuCore.getBasket();
     MenuCore.getBasketSections().forEach(function (s) {
-      var lines = MenuCore.getBasketBySection(s.id);
-      var count = lines.reduce(function (n, l) { return n + l.qty; }, 0);
+      var count = allLines.filter(function (l) { return l.sectionId === s.id; })
+        .reduce(function (n, l) { return n + l.qty; }, 0);
       $t.append(MenuRender.buildBasketSectionTab(s, active, count));
     });
   }
@@ -2197,7 +2211,7 @@ var MenuBasket = (function () {
     });
 
     _$root.on("click", "." + ns("basket-clear-section"), function () {
-      MenuCore.clearSection(MenuCore.getActiveSectionId());
+      MenuCore.clearSectionAll(MenuCore.getActiveSectionId());
     });
 
     _$root.on("click", "." + ns("existing-order-toggle"), function () {

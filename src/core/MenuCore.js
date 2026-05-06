@@ -439,6 +439,15 @@ var MenuCore = (function () {
     }
   }
 
+  function clearSectionAll(sectionId) {
+    var before = _basket.length;
+    _basket = _basket.filter(function (l) { return l.sectionId !== sectionId; });
+    _sectionServings[sectionId] = 1;
+    if (_basket.length !== before) {
+      MenuEvents.emit("basket:changed", { reason: "clear" });
+    }
+  }
+
   /**
    * Remove a completed serving for a section and renumber remaining ones.
    * If serving 1 of 3 is removed: [1,2,3] → [1,2] (former 2→1, former 3→2).
@@ -702,6 +711,7 @@ var MenuCore = (function () {
     moveLineToServing: moveLineToServing,
     reorderServings: reorderServings,
     clearSection: clearSection,
+    clearSectionAll: clearSectionAll,
     removeServing: removeServing,
     clearBasket: clearBasket,
 
