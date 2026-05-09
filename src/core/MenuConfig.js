@@ -16,12 +16,16 @@ var MenuConfig = (function () {
     items: [],
 
     // Basket sections — ordered tabs displayed in the basket panel
-    // [{ id, label, icon }]
+    // [{ id, code, label, icon? }]  id = backend int, code = string identifier
     basketSections: [
-      { id: "kitchen", label: "Kitchen", icon: "fa-solid fa-utensils" },
-      { id: "bar", label: "Bar", icon: "fa-solid fa-martini-glass" },
+      { id: null, code: "kitchen", label: "Kitchen", icon: "fa-solid fa-utensils" },
+      { id: null, code: "bar",     label: "Bar",     icon: "fa-solid fa-martini-glass" },
     ],
     defaultBasketSection: "kitchen",
+
+    // Menu routes — maps categoryId → basketId (from external API)
+    // [{ id, categoryId, basketId }]  also accepts PascalCase { Id, CategoryId, BasketId }
+    menuRoutes: [],
 
     // Currency formatter
     currency: {
@@ -135,20 +139,41 @@ var MenuConfig = (function () {
 
   function normalizeCategory(c) {
     var subs = _v(c.SubCategories, c.subcategories);
+    var rawId   = _v(c.Id,   c.id)   || "";
+    var rawCode = _v(c.Code, c.code) || "";
+    // Backwards compat: old format had no code, used id as the functional identifier
+    if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
-      id:            _v(c.Id,            c.id)            || "",
-      label:         _v(c.Label,         c.label)         || "",
-      icon:          _v(c.Icon,          c.icon)          || "",
-      basketSection: _v(c.BasketSection, c.basketSection) || "",
+      id:            rawId,
+      code:          rawCode,
+      label:         _v(c.Label, c.label) || "",
+      icon:          _v(c.Icon,  c.icon)  || "",
       subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
     };
   }
 
   function normalizeSubcategory(s) {
     return {
-      id:            _v(s.Id,            s.id)            || "",
-      label:         _v(s.Label,         s.label)         || "",
-      basketSection: _v(s.BasketSection, s.basketSection) || ""
+      id:    _v(s.Id,    s.id)    || "",
+      label: _v(s.Label, s.label) || ""
+    };
+  }
+
+  function normalizeBasketSection(s) {
+    var rawId   = s.Id   !== undefined ? s.Id   : s.id;
+    var rawCode = s.Code !== undefined ? s.Code : s.code;
+    var rawLabel = _v(s.Label, s.label) || "";
+    var rawIcon  = _v(s.Icon,  s.icon)  || "";
+    // Backwards compat: old format used a string id with no code field
+    if ((rawCode == null || rawCode === "") && typeof rawId === "string") {
+      rawCode = rawId;
+      rawId   = null;
+    }
+    return {
+      id:    (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
+      code:  String(rawCode  || ""),
+      label: String(rawLabel || ""),
+      icon:  String(rawIcon  || "")
     };
   }
 
@@ -161,8 +186,15 @@ var MenuConfig = (function () {
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
       categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
-      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || "",
-      basketSection: _v(it.BasketSection, it.basketSection) || ""
+      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || ""
+    };
+  }
+
+  function normalizeRoute(r) {
+    return {
+      id:         _v(r.Id,         r.id)         || 0,
+      categoryId: _v(r.CategoryId, r.categoryId) || "",
+      basketId:   _v(r.BasketId,   r.basketId)   || ""
     };
   }
 
@@ -175,12 +207,14 @@ var MenuConfig = (function () {
     if (Array.isArray(out.items)) {
       out.items = out.items.map(normalizeItem);
     }
-    // Normalize callable sections
+    // Normalize basket sections
     if (!Array.isArray(out.basketSections) || !out.basketSections.length) {
       out.basketSections = _defaults.basketSections.slice();
+    } else {
+      out.basketSections = out.basketSections.map(normalizeBasketSection);
     }
     if (!out.defaultBasketSection) {
-      out.defaultBasketSection = out.basketSections[0].id;
+      out.defaultBasketSection = out.basketSections[0].code;
     }
     return out;
   }
@@ -188,6 +222,8 @@ var MenuConfig = (function () {
   return {
     merge: merge,
     normalizeCategory: normalizeCategory,
-    normalizeItem: normalizeItem
+    normalizeItem: normalizeItem,
+    normalizeRoute: normalizeRoute,
+    normalizeBasketSection: normalizeBasketSection
   };
 })();

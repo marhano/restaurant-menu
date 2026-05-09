@@ -141,10 +141,10 @@ var MenuRender = (function () {
     categories.forEach(function (c) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-cat-id", c.id)
-        .toggleClass(ns("cat-tab--active"), c.id === activeId);
+        .attr("data-cat-id", c.code)
+        .toggleClass(ns("cat-tab--active"), c.code === activeId);
       if (c.icon) $tab.append(jQuery("<i>").addClass(c.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(c.label || c.id));
+      $tab.append(jQuery("<span>").text(c.label || c.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -274,10 +274,10 @@ var MenuRender = (function () {
   function buildBasketSectionTab(section, activeId, count) {
     var $tab = jQuery("<button>")
       .addClass(ns("basket-tab"))
-      .attr("data-section-id", section.id)
-      .toggleClass(ns("basket-tab--active"), section.id === activeId);
+      .attr("data-section-id", section.code)
+      .toggleClass(ns("basket-tab--active"), section.code === activeId);
     if (section.icon) $tab.append(jQuery("<i>").addClass(section.icon + " " + ns("basket-tab-icon")));
-    $tab.append(jQuery("<span>").text(section.label || section.id));
+    $tab.append(jQuery("<span>").text(section.label || section.code));
     if (count) $tab.append(jQuery("<span>").addClass(ns("basket-tab-count")).text(count));
     return $tab;
   }

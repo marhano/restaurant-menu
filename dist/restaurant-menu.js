@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-06T04:05:42.172Z
+ * Built: 2026-05-09T15:06:00.499Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -25,12 +25,16 @@ var MenuConfig = (function () {
     items: [],
 
     // Basket sections — ordered tabs displayed in the basket panel
-    // [{ id, label, icon }]
+    // [{ id, code, label, icon? }]  id = backend int, code = string identifier
     basketSections: [
-      { id: "kitchen", label: "Kitchen", icon: "fa-solid fa-utensils" },
-      { id: "bar", label: "Bar", icon: "fa-solid fa-martini-glass" },
+      { id: null, code: "kitchen", label: "Kitchen", icon: "fa-solid fa-utensils" },
+      { id: null, code: "bar",     label: "Bar",     icon: "fa-solid fa-martini-glass" },
     ],
     defaultBasketSection: "kitchen",
+
+    // Menu routes — maps categoryId → basketId (from external API)
+    // [{ id, categoryId, basketId }]  also accepts PascalCase { Id, CategoryId, BasketId }
+    menuRoutes: [],
 
     // Currency formatter
     currency: {
@@ -144,20 +148,41 @@ var MenuConfig = (function () {
 
   function normalizeCategory(c) {
     var subs = _v(c.SubCategories, c.subcategories);
+    var rawId   = _v(c.Id,   c.id)   || "";
+    var rawCode = _v(c.Code, c.code) || "";
+    // Backwards compat: old format had no code, used id as the functional identifier
+    if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
-      id:            _v(c.Id,            c.id)            || "",
-      label:         _v(c.Label,         c.label)         || "",
-      icon:          _v(c.Icon,          c.icon)          || "",
-      basketSection: _v(c.BasketSection, c.basketSection) || "",
+      id:            rawId,
+      code:          rawCode,
+      label:         _v(c.Label, c.label) || "",
+      icon:          _v(c.Icon,  c.icon)  || "",
       subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
     };
   }
 
   function normalizeSubcategory(s) {
     return {
-      id:            _v(s.Id,            s.id)            || "",
-      label:         _v(s.Label,         s.label)         || "",
-      basketSection: _v(s.BasketSection, s.basketSection) || ""
+      id:    _v(s.Id,    s.id)    || "",
+      label: _v(s.Label, s.label) || ""
+    };
+  }
+
+  function normalizeBasketSection(s) {
+    var rawId   = s.Id   !== undefined ? s.Id   : s.id;
+    var rawCode = s.Code !== undefined ? s.Code : s.code;
+    var rawLabel = _v(s.Label, s.label) || "";
+    var rawIcon  = _v(s.Icon,  s.icon)  || "";
+    // Backwards compat: old format used a string id with no code field
+    if ((rawCode == null || rawCode === "") && typeof rawId === "string") {
+      rawCode = rawId;
+      rawId   = null;
+    }
+    return {
+      id:    (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
+      code:  String(rawCode  || ""),
+      label: String(rawLabel || ""),
+      icon:  String(rawIcon  || "")
     };
   }
 
@@ -170,8 +195,15 @@ var MenuConfig = (function () {
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
       categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
-      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || "",
-      basketSection: _v(it.BasketSection, it.basketSection) || ""
+      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || ""
+    };
+  }
+
+  function normalizeRoute(r) {
+    return {
+      id:         _v(r.Id,         r.id)         || 0,
+      categoryId: _v(r.CategoryId, r.categoryId) || "",
+      basketId:   _v(r.BasketId,   r.basketId)   || ""
     };
   }
 
@@ -184,12 +216,14 @@ var MenuConfig = (function () {
     if (Array.isArray(out.items)) {
       out.items = out.items.map(normalizeItem);
     }
-    // Normalize callable sections
+    // Normalize basket sections
     if (!Array.isArray(out.basketSections) || !out.basketSections.length) {
       out.basketSections = _defaults.basketSections.slice();
+    } else {
+      out.basketSections = out.basketSections.map(normalizeBasketSection);
     }
     if (!out.defaultBasketSection) {
-      out.defaultBasketSection = out.basketSections[0].id;
+      out.defaultBasketSection = out.basketSections[0].code;
     }
     return out;
   }
@@ -197,7 +231,9 @@ var MenuConfig = (function () {
   return {
     merge: merge,
     normalizeCategory: normalizeCategory,
-    normalizeItem: normalizeItem
+    normalizeItem: normalizeItem,
+    normalizeRoute: normalizeRoute,
+    normalizeBasketSection: normalizeBasketSection
   };
 })();
 
@@ -240,6 +276,7 @@ var MenuEvents = (function () {
  */
 var MenuCore = (function () {
   var _cfg = null;
+  var _menuRoutes = [];
   var _activeCategoryId = null;
   var _activeSubcategoryId = null; // null = "all" within category
   var _activeSectionId = null;     // active basket section tab
@@ -259,7 +296,7 @@ var MenuCore = (function () {
   function _initSectionServings(sections) {
     var next = {};
     (sections || []).forEach(function (s) {
-      next[s.id] = _sectionServings[s.id] || 1;
+      next[s.code] = _sectionServings[s.code] || 1;
     });
     _sectionServings = next;
   }
@@ -271,16 +308,18 @@ var MenuCore = (function () {
     _existingOrder = [];
     _lineSeq = 1;
     _sectionServings = {};
-    (cfg.basketSections || []).forEach(function (s) { _sectionServings[s.id] = 1; });
+    (cfg.basketSections || []).forEach(function (s) { _sectionServings[s.code] = 1; });
     _search = "";
     _filters = jQuery.extend(true, { minPrice: null, maxPrice: null, sort: "default" }, cfg.filters || {});
-    _activeCategoryId = (cfg.categories && cfg.categories[0]) ? cfg.categories[0].id : null;
+    _activeCategoryId = (cfg.categories && cfg.categories[0]) ? cfg.categories[0].code : null;
     _activeSubcategoryId = null;
     _activeSectionId = cfg.defaultBasketSection;
+    _menuRoutes = Array.isArray(cfg.menuRoutes) ? cfg.menuRoutes.map(MenuConfig.normalizeRoute) : [];
   }
 
   function reset() {
     _cfg = null;
+    _menuRoutes = [];
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
@@ -317,8 +356,8 @@ var MenuCore = (function () {
     _cfg.categories = Array.isArray(cats) ? cats.map(MenuConfig.normalizeCategory) : [];
     // Reconcile active selection
     var list = _cfg.categories;
-    var exists = list.some(function (c) { return c.id === _activeCategoryId; });
-    _activeCategoryId = exists ? _activeCategoryId : (list[0] ? list[0].id : null);
+    var exists = list.some(function (c) { return c.code === _activeCategoryId; });
+    _activeCategoryId = exists ? _activeCategoryId : (list[0] ? list[0].code : null);
     var subs = getSubcategories(_activeCategoryId);
     if (_activeSubcategoryId && !subs.some(function (s) { return s.id === _activeSubcategoryId; })) {
       _activeSubcategoryId = null;
@@ -329,17 +368,19 @@ var MenuCore = (function () {
   function setBasketSections(sections) {
     if (!_cfg) return;
     _cfg.basketSections = Array.isArray(sections) && sections.length
-      ? sections.slice() : _cfg.basketSections;
-    // Reconcile active section
-    var ok = _cfg.basketSections.some(function (s) { return s.id === _activeSectionId; });
-    if (!ok) _activeSectionId = _cfg.basketSections[0].id;
+      ? sections.map(MenuConfig.normalizeBasketSection) : _cfg.basketSections;
+    // Reconcile active section and default
+    var ok = _cfg.basketSections.some(function (s) { return s.code === _activeSectionId; });
+    if (!ok) _activeSectionId = _cfg.basketSections[0].code;
+    var defaultOk = _cfg.basketSections.some(function (s) { return s.code === _cfg.defaultBasketSection; });
+    if (!defaultOk) _cfg.defaultBasketSection = _cfg.basketSections[0].code;
     // Preserve serving counters for existing sections, add new ones at 1
     _initSectionServings(_cfg.basketSections);
     // Move any basket lines in removed sections to the default
     var valid = {};
-    _cfg.basketSections.forEach(function (s) { valid[s.id] = true; });
+    _cfg.basketSections.forEach(function (s) { valid[s.code] = true; });
     _basket.forEach(function (l) {
-      if (!valid[l.sectionId]) l.sectionId = _cfg.basketSections[0].id;
+      if (!valid[l.sectionId]) l.sectionId = _cfg.basketSections[0].code;
     });
     MenuEvents.emit("sections:changed");
     MenuEvents.emit("basket:changed", { reason: "section" });
@@ -367,7 +408,7 @@ var MenuCore = (function () {
   function getCategories() { return _cfg ? _cfg.categories || [] : []; }
 
   function getCategory(id) {
-    return getCategories().find(function (c) { return c.id === id; }) || null;
+    return getCategories().find(function (c) { return c.code === id; }) || null;
   }
 
   function getSubcategories(categoryId) {
@@ -491,32 +532,54 @@ var MenuCore = (function () {
     MenuEvents.emit("section:changed", id);
   }
 
+  function setMenuRoutes(routes) {
+    _menuRoutes = Array.isArray(routes) ? routes.map(MenuConfig.normalizeRoute) : [];
+  }
+
+  function getMenuRoutes() { return _menuRoutes.slice(); }
+
+  function _routeFor(key) {
+    for (var i = 0; i < _menuRoutes.length; i++) {
+      if (_menuRoutes[i].categoryId === key && _menuRoutes[i].basketId) {
+        return _menuRoutes[i].basketId;
+      }
+    }
+    return null;
+  }
+
+  function _parentCategoryOf(subcategoryId) {
+    var cats = getCategories();
+    for (var i = 0; i < cats.length; i++) {
+      var subs = cats[i].subcategories || [];
+      for (var j = 0; j < subs.length; j++) {
+        if (subs[j].id === subcategoryId) return cats[i];
+      }
+    }
+    return null;
+  }
+
   /**
    * Resolve target basket section for an item.
-   * Precedence: explicit override > item.basketSection > subcategory.basketSection
-   *             > category.basketSection > cfg.defaultBasketSection
+   * Precedence:
+   *   1. Explicit override (e.g. ellipsis popover pick)
+   *   2. Subcategory-level route  — route.categoryId === item.subcategoryId
+   *   3. Parent category route    — route.categoryId === parentCategory.code
+   *   4. defaultBasketSection
+   *
+   * item.categoryId is intentionally ignored — backends often send a generic
+   * value (e.g. "SERVICES") for all items, making it useless for routing.
    */
   function resolveSection(item, overrideSectionId) {
     if (overrideSectionId) return overrideSectionId;
-    if (item && item.basketSection) return item.basketSection;
-
-    // Scan all categories to find the subcategory and its parent.
-    // Subcategory basketSection wins; if absent, use the parent category's.
     if (item && item.subcategoryId) {
-      var cats = getCategories();
-      for (var i = 0; i < cats.length; i++) {
-        var subs = cats[i].subcategories || [];
-        var sub = subs.find(function (s) { return s.id === item.subcategoryId; });
-        if (sub) {
-          if (sub.basketSection) return sub.basketSection;
-          if (cats[i].basketSection) return cats[i].basketSection;
-          break;
-        }
+      var subRoute = _routeFor(item.subcategoryId);
+      if (subRoute) return subRoute;
+      var parent = _parentCategoryOf(item.subcategoryId);
+      if (parent) {
+        var catRoute = _routeFor(parent.code);
+        if (catRoute) return catRoute;
       }
     }
-
-    var cat = getCategory(item && item.categoryId);
-    if (cat && cat.basketSection) return cat.basketSection;
     return _cfg.defaultBasketSection;
   }
 
@@ -895,6 +958,8 @@ var MenuCore = (function () {
     updateItemImage: updateItemImage,
     setCategories: setCategories,
     setBasketSections: setBasketSections,
+    setMenuRoutes: setMenuRoutes,
+    getMenuRoutes: getMenuRoutes,
     startNewOrder: startNewOrder,
 
     // Menu
@@ -1106,10 +1171,10 @@ var MenuRender = (function () {
     categories.forEach(function (c) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-cat-id", c.id)
-        .toggleClass(ns("cat-tab--active"), c.id === activeId);
+        .attr("data-cat-id", c.code)
+        .toggleClass(ns("cat-tab--active"), c.code === activeId);
       if (c.icon) $tab.append(jQuery("<i>").addClass(c.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(c.label || c.id));
+      $tab.append(jQuery("<span>").text(c.label || c.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -1239,10 +1304,10 @@ var MenuRender = (function () {
   function buildBasketSectionTab(section, activeId, count) {
     var $tab = jQuery("<button>")
       .addClass(ns("basket-tab"))
-      .attr("data-section-id", section.id)
-      .toggleClass(ns("basket-tab--active"), section.id === activeId);
+      .attr("data-section-id", section.code)
+      .toggleClass(ns("basket-tab--active"), section.code === activeId);
     if (section.icon) $tab.append(jQuery("<i>").addClass(section.icon + " " + ns("basket-tab-icon")));
-    $tab.append(jQuery("<span>").text(section.label || section.id));
+    $tab.append(jQuery("<span>").text(section.label || section.code));
     if (count) $tab.append(jQuery("<span>").addClass(ns("basket-tab-count")).text(count));
     return $tab;
   }
@@ -1674,9 +1739,9 @@ var MenuBrowse = (function () {
     var $pop = jQuery("<div>").addClass(MenuRender.ns("popover"));
     $pop.append(jQuery("<div>").addClass(MenuRender.ns("popover-title")).text(cfg.labels.sendTo));
     sections.forEach(function (s) {
-      var $opt = jQuery("<button>").addClass(MenuRender.ns("popover-opt")).attr("data-section-id", s.id);
+      var $opt = jQuery("<button>").addClass(MenuRender.ns("popover-opt")).attr("data-section-id", s.code);
       if (s.icon) $opt.append(jQuery("<i>").addClass(s.icon));
-      $opt.append(jQuery("<span>").text(s.label || s.id));
+      $opt.append(jQuery("<span>").text(s.label || s.code));
       $pop.append($opt);
     });
 
@@ -1817,7 +1882,7 @@ var MenuEditLine = (function () {
     // ── Section selector ───────────────────────────────
     var $sel = jQuery("<select>").addClass(ns("field-input"));
     MenuCore.getBasketSections().forEach(function (s) {
-      $sel.append(jQuery("<option>").attr("value", s.id).text(s.label || s.id));
+      $sel.append(jQuery("<option>").attr("value", s.code).text(s.label || s.code));
     });
     $sel.val(line.sectionId);
 
@@ -1969,7 +2034,7 @@ var MenuBasket = (function () {
     var active = MenuCore.getActiveSectionId();
     var allLines = MenuCore.getBasket();
     MenuCore.getBasketSections().forEach(function (s) {
-      var count = allLines.filter(function (l) { return l.sectionId === s.id; })
+      var count = allLines.filter(function (l) { return l.sectionId === s.code; })
         .reduce(function (n, l) { return n + l.qty; }, 0);
       $t.append(MenuRender.buildBasketSectionTab(s, active, count));
     });
@@ -2279,10 +2344,10 @@ var MenuBasket = (function () {
     _$root.on("click", "." + ns("btn-send-order"), function () {
       var servingsBySection = {};
       MenuCore.getBasketSections().forEach(function (s) {
-        var all = MenuCore.getServings(s.id).slice();   // completed servings
-        var current = MenuCore.getBasketBySection(s.id); // active serving items
-        if (current.length) all.push({ serving: MenuCore.getServing(s.id), lines: current });
-        if (all.length) servingsBySection[s.id] = all;
+        var all = MenuCore.getServings(s.code).slice();   // completed servings
+        var current = MenuCore.getBasketBySection(s.code); // active serving items
+        if (current.length) all.push({ serving: MenuCore.getServing(s.code), lines: current });
+        if (all.length) servingsBySection[s.code] = all;
       });
       var rawBasket = MenuCore.getBasket();
       var basketMap = {};
@@ -2927,9 +2992,11 @@ var RestaurantMenu = (function () {
       isBasketOpen: function () { return $shell.hasClass("rm-wrapper--basket-open"); },
 
       // Live data updates (no re-create)
-      updateItems:           function (items)    { MenuCore.setItems(items); },
-      updateCategories:      function (cats)     { MenuCore.setCategories(cats); },
-      updateBasketSections:  function (sections) { MenuCore.setBasketSections(sections); },
+      updateItems:          function (items)    { MenuCore.setItems(items); },
+      updateCategories:     function (cats)     { MenuCore.setCategories(cats); },
+      updateBasketSections: function (sections) { MenuCore.setBasketSections(sections); },
+      updateMenuRoutes:     function (routes)   { MenuCore.setMenuRoutes(routes); },
+      getMenuRoutes:        function ()         { return MenuCore.getMenuRoutes(); },
 
       /**
        * Swap table, clear basket and reset serving — suitable for starting a

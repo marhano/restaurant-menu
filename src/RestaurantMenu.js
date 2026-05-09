@@ -237,9 +237,11 @@ var RestaurantMenu = (function () {
       isBasketOpen: function () { return $shell.hasClass("rm-wrapper--basket-open"); },
 
       // Live data updates (no re-create)
-      updateItems:           function (items)    { MenuCore.setItems(items); },
-      updateCategories:      function (cats)     { MenuCore.setCategories(cats); },
-      updateBasketSections:  function (sections) { MenuCore.setBasketSections(sections); },
+      updateItems:          function (items)    { MenuCore.setItems(items); },
+      updateCategories:     function (cats)     { MenuCore.setCategories(cats); },
+      updateBasketSections: function (sections) { MenuCore.setBasketSections(sections); },
+      updateMenuRoutes:     function (routes)   { MenuCore.setMenuRoutes(routes); },
+      getMenuRoutes:        function ()         { return MenuCore.getMenuRoutes(); },
 
       /**
        * Swap table, clear basket and reset serving — suitable for starting a
