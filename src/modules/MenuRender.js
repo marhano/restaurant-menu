@@ -141,10 +141,10 @@ var MenuRender = (function () {
     categories.forEach(function (c) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-cat-id", c.id)
-        .toggleClass(ns("cat-tab--active"), c.id === activeId);
+        .attr("data-cat-id", c.code)
+        .toggleClass(ns("cat-tab--active"), c.code === activeId);
       if (c.icon) $tab.append(jQuery("<i>").addClass(c.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(c.label || c.id));
+      $tab.append(jQuery("<span>").text(c.label || c.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -163,10 +163,10 @@ var MenuRender = (function () {
     subcategories.forEach(function (s) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-sub-id", s.id)
-        .toggleClass(ns("cat-tab--active"), s.id === activeSubId);
+        .attr("data-sub-id", s.code)
+        .toggleClass(ns("cat-tab--active"), s.code === activeSubId);
       if (s.icon) $tab.append(jQuery("<i>").addClass(s.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(s.label || s.id));
+      $tab.append(jQuery("<span>").text(s.label || s.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -185,9 +185,9 @@ var MenuRender = (function () {
     subs.forEach(function (s) {
       $wrap.append(
         jQuery("<button>").addClass(ns("sub-tab"))
-          .toggleClass(ns("sub-tab--active"), s.id === activeId)
-          .attr("data-sub-id", s.id)
-          .text(s.label || s.id)
+          .toggleClass(ns("sub-tab--active"), s.code === activeId)
+          .attr("data-sub-id", s.code)
+          .text(s.label || s.code)
       );
     });
     return $wrap;
@@ -274,10 +274,10 @@ var MenuRender = (function () {
   function buildBasketSectionTab(section, activeId, count) {
     var $tab = jQuery("<button>")
       .addClass(ns("basket-tab"))
-      .attr("data-section-id", section.id)
-      .toggleClass(ns("basket-tab--active"), section.id === activeId);
+      .attr("data-section-id", section.code)
+      .toggleClass(ns("basket-tab--active"), section.code === activeId);
     if (section.icon) $tab.append(jQuery("<i>").addClass(section.icon + " " + ns("basket-tab-icon")));
-    $tab.append(jQuery("<span>").text(section.label || section.id));
+    $tab.append(jQuery("<span>").text(section.label || section.code));
     if (count) $tab.append(jQuery("<span>").addClass(ns("basket-tab-count")).text(count));
     return $tab;
   }

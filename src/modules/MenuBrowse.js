@@ -290,9 +290,9 @@ var MenuBrowse = (function () {
     var $pop = jQuery("<div>").addClass(MenuRender.ns("popover"));
     $pop.append(jQuery("<div>").addClass(MenuRender.ns("popover-title")).text(cfg.labels.sendTo));
     sections.forEach(function (s) {
-      var $opt = jQuery("<button>").addClass(MenuRender.ns("popover-opt")).attr("data-section-id", s.id);
+      var $opt = jQuery("<button>").addClass(MenuRender.ns("popover-opt")).attr("data-section-id", s.code);
       if (s.icon) $opt.append(jQuery("<i>").addClass(s.icon));
-      $opt.append(jQuery("<span>").text(s.label || s.id));
+      $opt.append(jQuery("<span>").text(s.label || s.code));
       $pop.append($opt);
     });
 

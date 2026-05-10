@@ -107,7 +107,7 @@ var MenuBasket = (function () {
     var active = MenuCore.getActiveSectionId();
     var allLines = MenuCore.getBasket();
     MenuCore.getBasketSections().forEach(function (s) {
-      var count = allLines.filter(function (l) { return l.sectionId === s.id; })
+      var count = allLines.filter(function (l) { return l.sectionId === s.code; })
         .reduce(function (n, l) { return n + l.qty; }, 0);
       $t.append(MenuRender.buildBasketSectionTab(s, active, count));
     });
@@ -417,10 +417,10 @@ var MenuBasket = (function () {
     _$root.on("click", "." + ns("btn-send-order"), function () {
       var servingsBySection = {};
       MenuCore.getBasketSections().forEach(function (s) {
-        var all = MenuCore.getServings(s.id).slice();   // completed servings
-        var current = MenuCore.getBasketBySection(s.id); // active serving items
-        if (current.length) all.push({ serving: MenuCore.getServing(s.id), lines: current });
-        if (all.length) servingsBySection[s.id] = all;
+        var all = MenuCore.getServings(s.code).slice();   // completed servings
+        var current = MenuCore.getBasketBySection(s.code); // active serving items
+        if (current.length) all.push({ serving: MenuCore.getServing(s.code), lines: current });
+        if (all.length) servingsBySection[s.code] = all;
       });
       var rawBasket = MenuCore.getBasket();
       var basketMap = {};

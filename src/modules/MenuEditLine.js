@@ -83,7 +83,7 @@ var MenuEditLine = (function () {
     // ── Section selector ───────────────────────────────
     var $sel = jQuery("<select>").addClass(ns("field-input"));
     MenuCore.getBasketSections().forEach(function (s) {
-      $sel.append(jQuery("<option>").attr("value", s.id).text(s.label || s.id));
+      $sel.append(jQuery("<option>").attr("value", s.code).text(s.label || s.code));
     });
     $sel.val(line.sectionId);
 
