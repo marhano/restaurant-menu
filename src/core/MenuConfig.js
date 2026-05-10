@@ -140,7 +140,7 @@ var MenuConfig = (function () {
   }
 
   function normalizeCategory(c) {
-    var subs = _v(c.SubCategories, c.subcategories);
+    var subs = _v(c.SubCategories, c.subCategories || c.subcategories);
     var rawId   = String(_v(c.Id,   c.id)   || "");
     var rawCode = String(_v(c.Code, c.code) || "");
     // Backwards compat: old format had no code, used id as the functional identifier
