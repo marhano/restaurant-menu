@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-09T15:06:00.499Z
+ * Built: 2026-05-10T09:59:45.614Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -19,7 +19,9 @@ var MenuConfig = (function () {
     table: null, // { id, name, seats, guests, server }
 
     // Menu data
-    // categories: [{ id, label, icon, subcategories: [{ id, label, basketSection? }], basketSection? }]
+    // categories: [{ id, label, icon, status?, subcategories: [{ id, label, status? }] }]
+    // status: "active" (default) | "inactive" — inactive categories hide all their subcategories.
+    // A subcategory status of "inactive" hides it regardless of parent; parent "inactive" overrides child.
     categories: [],
     // items: [{ id, name, description, price, image, categoryId, subcategoryId, basketSection? }]
     items: [],
@@ -148,23 +150,30 @@ var MenuConfig = (function () {
 
   function normalizeCategory(c) {
     var subs = _v(c.SubCategories, c.subcategories);
-    var rawId   = _v(c.Id,   c.id)   || "";
-    var rawCode = _v(c.Code, c.code) || "";
+    var rawId   = String(_v(c.Id,   c.id)   || "");
+    var rawCode = String(_v(c.Code, c.code) || "");
     // Backwards compat: old format had no code, used id as the functional identifier
     if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
       id:            rawId,
       code:          rawCode,
-      label:         _v(c.Label, c.label) || "",
-      icon:          _v(c.Icon,  c.icon)  || "",
+      label:         _v(c.Label, c.label)   || "",
+      icon:          _v(c.Icon,  c.icon)    || "",
+      status:        (_v(c.Status, c.status) || "active").toLowerCase(),
       subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
     };
   }
 
   function normalizeSubcategory(s) {
+    var rawId   = String(_v(s.Id,   s.id)   || "");
+    var rawCode = String(_v(s.Code, s.code) || "");
+    // Backwards compat: if no code supplied, use id as the functional identifier
+    if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
-      id:    _v(s.Id,    s.id)    || "",
-      label: _v(s.Label, s.label) || ""
+      id:     rawId,
+      code:   rawCode,
+      label:  _v(s.Label, s.label) || "",
+      status: (_v(s.Status, s.status) || "active").toLowerCase()
     };
   }
 
@@ -179,10 +188,11 @@ var MenuConfig = (function () {
       rawId   = null;
     }
     return {
-      id:    (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
-      code:  String(rawCode  || ""),
-      label: String(rawLabel || ""),
-      icon:  String(rawIcon  || "")
+      id:     (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
+      code:   String(rawCode  || ""),
+      label:  String(rawLabel || ""),
+      icon:   String(rawIcon  || ""),
+      status: (_v(s.Status, s.status) || "active").toLowerCase()
     };
   }
 
@@ -194,8 +204,8 @@ var MenuConfig = (function () {
       description:   _v(it.Description,   it.description)   || "",
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
-      categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
-      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || ""
+      categoryId:    String(_v(it.CategoryId,    it.categoryId)    || ""),
+      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || "")
     };
   }
 
@@ -311,9 +321,12 @@ var MenuCore = (function () {
     (cfg.basketSections || []).forEach(function (s) { _sectionServings[s.code] = 1; });
     _search = "";
     _filters = jQuery.extend(true, { minPrice: null, maxPrice: null, sort: "default" }, cfg.filters || {});
-    _activeCategoryId = (cfg.categories && cfg.categories[0]) ? cfg.categories[0].code : null;
+    var _firstActiveCat = (cfg.categories || []).filter(function (c) { return c.status !== "inactive"; })[0];
+    _activeCategoryId = _firstActiveCat ? _firstActiveCat.code : null;
     _activeSubcategoryId = null;
-    _activeSectionId = cfg.defaultBasketSection;
+    var _activeSecs = (cfg.basketSections || []).filter(function (s) { return s.status !== "inactive"; });
+    var _defIsActive = _activeSecs.some(function (s) { return s.code === cfg.defaultBasketSection; });
+    _activeSectionId = _defIsActive ? cfg.defaultBasketSection : (_activeSecs[0] ? _activeSecs[0].code : cfg.defaultBasketSection);
     _menuRoutes = Array.isArray(cfg.menuRoutes) ? cfg.menuRoutes.map(MenuConfig.normalizeRoute) : [];
   }
 
@@ -354,12 +367,12 @@ var MenuCore = (function () {
   function setCategories(cats) {
     if (!_cfg) return;
     _cfg.categories = Array.isArray(cats) ? cats.map(MenuConfig.normalizeCategory) : [];
-    // Reconcile active selection
-    var list = _cfg.categories;
+    // Reconcile active selection against active categories only
+    var list = getCategories();
     var exists = list.some(function (c) { return c.code === _activeCategoryId; });
     _activeCategoryId = exists ? _activeCategoryId : (list[0] ? list[0].code : null);
     var subs = getSubcategories(_activeCategoryId);
-    if (_activeSubcategoryId && !subs.some(function (s) { return s.id === _activeSubcategoryId; })) {
+    if (_activeSubcategoryId && !subs.some(function (s) { return s.code === _activeSubcategoryId; })) {
       _activeSubcategoryId = null;
     }
     MenuEvents.emit("menu:changed", { reason: "categories" });
@@ -369,18 +382,20 @@ var MenuCore = (function () {
     if (!_cfg) return;
     _cfg.basketSections = Array.isArray(sections) && sections.length
       ? sections.map(MenuConfig.normalizeBasketSection) : _cfg.basketSections;
-    // Reconcile active section and default
-    var ok = _cfg.basketSections.some(function (s) { return s.code === _activeSectionId; });
-    if (!ok) _activeSectionId = _cfg.basketSections[0].code;
-    var defaultOk = _cfg.basketSections.some(function (s) { return s.code === _cfg.defaultBasketSection; });
-    if (!defaultOk) _cfg.defaultBasketSection = _cfg.basketSections[0].code;
-    // Preserve serving counters for existing sections, add new ones at 1
+    // Reconcile active section and default against active-only sections
+    var activeSecs = getBasketSections();
+    var firstActiveSec = activeSecs[0];
+    var ok = activeSecs.some(function (s) { return s.code === _activeSectionId; });
+    if (!ok && firstActiveSec) _activeSectionId = firstActiveSec.code;
+    var defaultOk = activeSecs.some(function (s) { return s.code === _cfg.defaultBasketSection; });
+    if (!defaultOk && firstActiveSec) _cfg.defaultBasketSection = firstActiveSec.code;
+    // Preserve serving counters for all sections (including inactive)
     _initSectionServings(_cfg.basketSections);
-    // Move any basket lines in removed sections to the default
-    var valid = {};
-    _cfg.basketSections.forEach(function (s) { valid[s.code] = true; });
+    // Move basket lines from removed or inactive sections to the first active section
+    var validActive = {};
+    activeSecs.forEach(function (s) { validActive[s.code] = true; });
     _basket.forEach(function (l) {
-      if (!valid[l.sectionId]) l.sectionId = _cfg.basketSections[0].code;
+      if (!validActive[l.sectionId] && firstActiveSec) l.sectionId = firstActiveSec.code;
     });
     MenuEvents.emit("sections:changed");
     MenuEvents.emit("basket:changed", { reason: "section" });
@@ -405,7 +420,9 @@ var MenuCore = (function () {
 
   // ── Menu queries ──────────────────────────────────
 
-  function getCategories() { return _cfg ? _cfg.categories || [] : []; }
+  function getCategories() {
+    return _cfg ? (_cfg.categories || []).filter(function (c) { return c.status !== "inactive"; }) : [];
+  }
 
   function getCategory(id) {
     return getCategories().find(function (c) { return c.code === id; }) || null;
@@ -413,14 +430,18 @@ var MenuCore = (function () {
 
   function getSubcategories(categoryId) {
     var c = getCategory(categoryId);
-    return (c && c.subcategories) ? c.subcategories : [];
+    return (c && c.subcategories)
+      ? c.subcategories.filter(function (s) { return s.status !== "inactive"; })
+      : [];
   }
 
   function getAllSubcategories() {
     var out = [];
     getCategories().forEach(function (c) {
       if (Array.isArray(c.subcategories)) {
-        c.subcategories.forEach(function (s) { out.push(s); });
+        c.subcategories.forEach(function (s) {
+          if (s.status !== "inactive") out.push(s);
+        });
       }
     });
     return out;
@@ -440,12 +461,36 @@ var MenuCore = (function () {
     var max = (_filters.maxPrice != null && _filters.maxPrice !== "") ? Number(_filters.maxPrice) : null;
 
     var out = items.filter(function (it) {
+      // Status filter: always applied regardless of search state.
+      // Items belonging to an inactive category or inactive subcategory are hidden.
+      if (it.categoryId) {
+        var _allCats = _cfg ? _cfg.categories || [] : [];
+        for (var _ci = 0; _ci < _allCats.length; _ci++) {
+          if (_allCats[_ci].code === it.categoryId) {
+            if (_allCats[_ci].status === "inactive") return false;
+            break;
+          }
+        }
+      }
+      if (it.subcategoryId) {
+        var _subParent = _parentCategoryOf(it.subcategoryId);
+        if (_subParent) {
+          if (_subParent.status === "inactive") return false;
+          var _allSubs = _subParent.subcategories || [];
+          for (var _si = 0; _si < _allSubs.length; _si++) {
+            if (_allSubs[_si].code === it.subcategoryId) {
+              if (_allSubs[_si].status === "inactive") return false;
+              break;
+            }
+          }
+        }
+      }
       // When searching, scan the whole menu (ignore category/subcategory).
       if (!hasSearch) {
         if (_activeCategoryId && !_cfg.subcategoryNav) {
           var _cat = getCategory(_activeCategoryId);
           var _subIds = (_cat && Array.isArray(_cat.subcategories))
-            ? _cat.subcategories.map(function (s) { return s.id; })
+            ? _cat.subcategories.map(function (s) { return s.code; })
             : [];
           // Match by categoryId directly OR by the item's subcategoryId belonging
           // to this category — supports items that carry no categoryId.
@@ -523,7 +568,9 @@ var MenuCore = (function () {
 
   // ── Basket section routing ────────────────────────
 
-  function getBasketSections() { return _cfg ? _cfg.basketSections || [] : []; }
+  function getBasketSections() {
+    return _cfg ? (_cfg.basketSections || []).filter(function (s) { return s.status !== "inactive"; }) : [];
+  }
 
   function getActiveSectionId() { return _activeSectionId; }
 
@@ -548,11 +595,11 @@ var MenuCore = (function () {
   }
 
   function _parentCategoryOf(subcategoryId) {
-    var cats = getCategories();
+    var cats = _cfg ? _cfg.categories || [] : [];
     for (var i = 0; i < cats.length; i++) {
       var subs = cats[i].subcategories || [];
       for (var j = 0; j < subs.length; j++) {
-        if (subs[j].id === subcategoryId) return cats[i];
+        if (subs[j].code === subcategoryId) return cats[i];
       }
     }
     return null;
@@ -570,17 +617,26 @@ var MenuCore = (function () {
    * value (e.g. "SERVICES") for all items, making it useless for routing.
    */
   function resolveSection(item, overrideSectionId) {
-    if (overrideSectionId) return overrideSectionId;
-    if (item && item.subcategoryId) {
+    var code;
+    if (overrideSectionId) {
+      code = overrideSectionId;
+    } else if (item && item.subcategoryId) {
       var subRoute = _routeFor(item.subcategoryId);
-      if (subRoute) return subRoute;
-      var parent = _parentCategoryOf(item.subcategoryId);
-      if (parent) {
-        var catRoute = _routeFor(parent.code);
-        if (catRoute) return catRoute;
+      if (subRoute) { code = subRoute; }
+      else {
+        var parent = _parentCategoryOf(item.subcategoryId);
+        if (parent) {
+          var catRoute = _routeFor(parent.code);
+          if (catRoute) { code = catRoute; }
+        }
       }
     }
-    return _cfg.defaultBasketSection;
+    if (!code) code = _cfg.defaultBasketSection;
+    // If the resolved section is inactive, fall back to the first active section
+    var activeSecs = getBasketSections();
+    var isActive = activeSecs.some(function (s) { return s.code === code; });
+    if (!isActive && activeSecs[0]) code = activeSecs[0].code;
+    return code;
   }
 
   // ── Basket ops ────────────────────────────────────
@@ -1193,10 +1249,10 @@ var MenuRender = (function () {
     subcategories.forEach(function (s) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-sub-id", s.id)
-        .toggleClass(ns("cat-tab--active"), s.id === activeSubId);
+        .attr("data-sub-id", s.code)
+        .toggleClass(ns("cat-tab--active"), s.code === activeSubId);
       if (s.icon) $tab.append(jQuery("<i>").addClass(s.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(s.label || s.id));
+      $tab.append(jQuery("<span>").text(s.label || s.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -1215,9 +1271,9 @@ var MenuRender = (function () {
     subs.forEach(function (s) {
       $wrap.append(
         jQuery("<button>").addClass(ns("sub-tab"))
-          .toggleClass(ns("sub-tab--active"), s.id === activeId)
-          .attr("data-sub-id", s.id)
-          .text(s.label || s.id)
+          .toggleClass(ns("sub-tab--active"), s.code === activeId)
+          .attr("data-sub-id", s.code)
+          .text(s.label || s.code)
       );
     });
     return $wrap;

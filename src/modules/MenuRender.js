@@ -163,10 +163,10 @@ var MenuRender = (function () {
     subcategories.forEach(function (s) {
       var $tab = jQuery("<button>")
         .addClass(ns("cat-tab"))
-        .attr("data-sub-id", s.id)
-        .toggleClass(ns("cat-tab--active"), s.id === activeSubId);
+        .attr("data-sub-id", s.code)
+        .toggleClass(ns("cat-tab--active"), s.code === activeSubId);
       if (s.icon) $tab.append(jQuery("<i>").addClass(s.icon + " " + ns("cat-tab-icon")));
-      $tab.append(jQuery("<span>").text(s.label || s.id));
+      $tab.append(jQuery("<span>").text(s.label || s.code));
       $wrap.append($tab);
     });
     return $wrap;
@@ -185,9 +185,9 @@ var MenuRender = (function () {
     subs.forEach(function (s) {
       $wrap.append(
         jQuery("<button>").addClass(ns("sub-tab"))
-          .toggleClass(ns("sub-tab--active"), s.id === activeId)
-          .attr("data-sub-id", s.id)
-          .text(s.label || s.id)
+          .toggleClass(ns("sub-tab--active"), s.code === activeId)
+          .attr("data-sub-id", s.code)
+          .text(s.label || s.code)
       );
     });
     return $wrap;

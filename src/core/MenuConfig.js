@@ -10,7 +10,9 @@ var MenuConfig = (function () {
     table: null, // { id, name, seats, guests, server }
 
     // Menu data
-    // categories: [{ id, label, icon, subcategories: [{ id, label, basketSection? }], basketSection? }]
+    // categories: [{ id, label, icon, status?, subcategories: [{ id, label, status? }] }]
+    // status: "active" (default) | "inactive" — inactive categories hide all their subcategories.
+    // A subcategory status of "inactive" hides it regardless of parent; parent "inactive" overrides child.
     categories: [],
     // items: [{ id, name, description, price, image, categoryId, subcategoryId, basketSection? }]
     items: [],
@@ -139,23 +141,30 @@ var MenuConfig = (function () {
 
   function normalizeCategory(c) {
     var subs = _v(c.SubCategories, c.subcategories);
-    var rawId   = _v(c.Id,   c.id)   || "";
-    var rawCode = _v(c.Code, c.code) || "";
+    var rawId   = String(_v(c.Id,   c.id)   || "");
+    var rawCode = String(_v(c.Code, c.code) || "");
     // Backwards compat: old format had no code, used id as the functional identifier
     if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
       id:            rawId,
       code:          rawCode,
-      label:         _v(c.Label, c.label) || "",
-      icon:          _v(c.Icon,  c.icon)  || "",
+      label:         _v(c.Label, c.label)   || "",
+      icon:          _v(c.Icon,  c.icon)    || "",
+      status:        (_v(c.Status, c.status) || "active").toLowerCase(),
       subcategories: Array.isArray(subs) ? subs.map(normalizeSubcategory) : []
     };
   }
 
   function normalizeSubcategory(s) {
+    var rawId   = String(_v(s.Id,   s.id)   || "");
+    var rawCode = String(_v(s.Code, s.code) || "");
+    // Backwards compat: if no code supplied, use id as the functional identifier
+    if (!rawCode && rawId) { rawCode = rawId; rawId = ""; }
     return {
-      id:    _v(s.Id,    s.id)    || "",
-      label: _v(s.Label, s.label) || ""
+      id:     rawId,
+      code:   rawCode,
+      label:  _v(s.Label, s.label) || "",
+      status: (_v(s.Status, s.status) || "active").toLowerCase()
     };
   }
 
@@ -170,10 +179,11 @@ var MenuConfig = (function () {
       rawId   = null;
     }
     return {
-      id:    (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
-      code:  String(rawCode  || ""),
-      label: String(rawLabel || ""),
-      icon:  String(rawIcon  || "")
+      id:     (rawId != null && rawId !== "" && !isNaN(parseInt(rawId, 10))) ? parseInt(rawId, 10) : null,
+      code:   String(rawCode  || ""),
+      label:  String(rawLabel || ""),
+      icon:   String(rawIcon  || ""),
+      status: (_v(s.Status, s.status) || "active").toLowerCase()
     };
   }
 
@@ -185,8 +195,8 @@ var MenuConfig = (function () {
       description:   _v(it.Description,   it.description)   || "",
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
-      categoryId:    _v(it.CategoryId,    it.categoryId)    || "",
-      subcategoryId: _v(it.SubCategoryId, it.subcategoryId) || ""
+      categoryId:    String(_v(it.CategoryId,    it.categoryId)    || ""),
+      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || "")
     };
   }
 
