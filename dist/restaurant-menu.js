@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-10T14:47:15.515Z
+ * Built: 2026-05-14T05:23:16.742Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -138,7 +138,7 @@ var MenuConfig = (function () {
     onBasketChange: null, // (basket)
     onSectionChange: null, // (sectionId)
     onNextServing: null, // (basket)  -> should return new serving number or promise
-    onSendOrder: null, // (order, done) order={ table, basket, serving }
+    onSendOrder: null, // (order, done) order={ table, basket, servings:[{ basketId, servings:[{ serving, items:[{ id, name, qty, note }] }] }], existingOrder, total }
     onTableChange: null, // (table)
     onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
   };
@@ -1258,6 +1258,20 @@ var MenuRender = (function () {
     return $wrap;
   }
 
+  function buildMenuItemTags(item) {
+    var $wrap = jQuery("<div>").addClass(ns("item-tags"));
+    if (item.tags && item.tags.length) {
+      item.tags.forEach(function (t) {
+        var $tag = jQuery("<span>")
+          .addClass(ns("item-tag"))
+          .append(jQuery("<i>").addClass("fa-solid fa-tag"))
+          .append(jQuery("<span>").text(t));
+        $wrap.append($tag);
+      });
+    }
+    return $wrap;
+  }
+
   // ── Sub-category pills ────────────────────────────
   function buildSubTabs(subs, activeId, allLabel) {
     var $wrap = jQuery("<div>").addClass(ns("sub-tabs"));
@@ -1488,6 +1502,7 @@ var MenuRender = (function () {
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
     buildSubcategoryNavTabs: buildSubcategoryNavTabs,
+    buildMenuItemTags: buildMenuItemTags,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,
@@ -1529,6 +1544,9 @@ var MenuBrowse = (function () {
           cfg.labels.all
         )
       );
+      $left.append(
+        MenuRender.buildMenuItemTags({ tags: ["Vegetarian", "Gluten-Free", 'Japan', '1999'] })
+      );
     } else {
       $left.append(
         MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
@@ -1539,6 +1557,11 @@ var MenuBrowse = (function () {
           MenuCore.getActiveSubcategoryId(),
           cfg.labels.all
         )
+      );
+      $left.append(
+        MenuRender.buildMenuItemTags({
+          tags: ["Vegetarian", "Gluten-Free", "Japan", "1999"],
+        }),
       );
     }
     $left.append(MenuRender.buildItemGrid());
@@ -2398,12 +2421,23 @@ var MenuBasket = (function () {
     });
 
     _$root.on("click", "." + ns("btn-send-order"), function () {
-      var servingsBySection = {};
+      var servings = [];
       MenuCore.getBasketSections().forEach(function (s) {
         var all = MenuCore.getServings(s.code).slice();   // completed servings
         var current = MenuCore.getBasketBySection(s.code); // active serving items
         if (current.length) all.push({ serving: MenuCore.getServing(s.code), lines: current });
-        if (all.length) servingsBySection[s.code] = all;
+        if (!all.length) return;
+        servings.push({
+          basketId: s.code,
+          servings: all.map(function (sv) {
+            return {
+              serving: sv.serving,
+              items: sv.lines.map(function (l) {
+                return { id: l.item.id, name: l.item.name, qty: l.qty, note: l.note };
+              })
+            };
+          })
+        });
       });
       var rawBasket = MenuCore.getBasket();
       var basketMap = {};
@@ -2422,7 +2456,7 @@ var MenuBasket = (function () {
       var order = {
         table: MenuCore.getTable(),
         basket: mergedBasket,
-        servings: servingsBySection,
+        servings: servings,
         existingOrder: MenuCore.getExistingOrder(),
         total: MenuCore.getBasketTotal()
       };

@@ -172,6 +172,20 @@ var MenuRender = (function () {
     return $wrap;
   }
 
+  function buildMenuItemTags(item) {
+    var $wrap = jQuery("<div>").addClass(ns("item-tags"));
+    if (item.tags && item.tags.length) {
+      item.tags.forEach(function (t) {
+        var $tag = jQuery("<span>")
+          .addClass(ns("item-tag"))
+          .append(jQuery("<i>").addClass("fa-solid fa-tag"))
+          .append(jQuery("<span>").text(t));
+        $wrap.append($tag);
+      });
+    }
+    return $wrap;
+  }
+
   // ── Sub-category pills ────────────────────────────
   function buildSubTabs(subs, activeId, allLabel) {
     var $wrap = jQuery("<div>").addClass(ns("sub-tabs"));
@@ -231,6 +245,9 @@ var MenuRender = (function () {
     $body.append(jQuery("<div>").addClass(ns("item-name")).text(item.name || ""));
     if (cfg.showDescriptions && item.description) {
       $body.append(jQuery("<div>").addClass(ns("item-desc")).text(item.description));
+    }
+    if (cfg.showTags && item.tags && item.tags.length) {
+      $body.append(buildMenuItemTags(item));
     }
     $body.append(jQuery("<div>").addClass(ns("item-price")).text(priceText));
     $card.append($body);
@@ -402,6 +419,7 @@ var MenuRender = (function () {
     buildFilterPopover: buildFilterPopover,
     buildCategoryTabs: buildCategoryTabs,
     buildSubcategoryNavTabs: buildSubcategoryNavTabs,
+    buildMenuItemTags: buildMenuItemTags,
     buildSubTabs: buildSubTabs,
     buildItemGrid: buildItemGrid,
     buildItemCard: buildItemCard,

@@ -399,6 +399,56 @@
   color: var(--rm-primary-dark);
 }
 
+/* ── Item tags ─────────────────────────────────────── */
+.rm-item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.rm-item-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    background-color: var(--rm-surface-dim);
+    color: var(--rm-surface-muted);
+    border: 1.5px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.rm-item-tag i {
+    font-size: 0.7rem;
+    color: var(--rm-surface-subtle);
+    transition: color 0.2s ease;
+}
+
+.rm-item-tag:hover {
+    background-color: var(--rm-border);
+    border-color: var(--rm-border-strong);
+    color: var(--rm-surface-alt);
+}
+
+.rm-item-tag:hover i {
+    color: var(--rm-surface-muted);
+}
+
+.rm-item-tag.active {
+    background-color: var(--rm-primary-soft);
+    color: var(--rm-primary);
+    border-color: var(--rm-primary);
+}
+
+.rm-item-tag.active i {
+    color: var(--rm-primary);
+}
+
 /* Filter-aware visibility */
 .rm-cat-tabs--hidden, .rm-sub-tabs--hidden { display: none !important; }
 

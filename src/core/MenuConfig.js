@@ -50,6 +50,7 @@ var MenuConfig = (function () {
     showFilter: true,
     showImages: true,
     showDescriptions: true,
+    showTags: true,
     showEllipsis: true, // per-item "…" menu to choose basket section
     showImageUpdate: false, // per-item button to replace the card image
     showSendOrderButton: true,
@@ -129,7 +130,7 @@ var MenuConfig = (function () {
     onBasketChange: null, // (basket)
     onSectionChange: null, // (sectionId)
     onNextServing: null, // (basket)  -> should return new serving number or promise
-    onSendOrder: null, // (order, done) order={ table, basket, serving }
+    onSendOrder: null, // (order, done) order={ table, basket, servings:[{ basketId, servings:[{ serving, items:[{ id, name, qty, note }] }] }], existingOrder, total }
     onTableChange: null, // (table)
     onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
   };
@@ -196,7 +197,8 @@ var MenuConfig = (function () {
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
       categoryId:    String(_v(it.CategoryId,    it.categoryId)    || ""),
-      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || "")
+      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || ""),
+      tags:          Array.isArray(_v(it.Tags, it.tags)) ? _v(it.Tags, it.tags) : []
     };
   }
 

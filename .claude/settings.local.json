@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node build.js)"
+      "Bash(node build.js)",
+      "Bash(Get-ChildItem -Path \"d:\\\\PRJCT\\\\Javascript\\\\restaurant-menu\\\\src\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

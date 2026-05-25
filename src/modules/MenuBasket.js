@@ -415,12 +415,23 @@ var MenuBasket = (function () {
     });
 
     _$root.on("click", "." + ns("btn-send-order"), function () {
-      var servingsBySection = {};
+      var servings = [];
       MenuCore.getBasketSections().forEach(function (s) {
         var all = MenuCore.getServings(s.code).slice();   // completed servings
         var current = MenuCore.getBasketBySection(s.code); // active serving items
         if (current.length) all.push({ serving: MenuCore.getServing(s.code), lines: current });
-        if (all.length) servingsBySection[s.code] = all;
+        if (!all.length) return;
+        servings.push({
+          basketId: s.code,
+          servings: all.map(function (sv) {
+            return {
+              serving: sv.serving,
+              items: sv.lines.map(function (l) {
+                return { id: l.item.id, name: l.item.name, qty: l.qty, note: l.note };
+              })
+            };
+          })
+        });
       });
       var rawBasket = MenuCore.getBasket();
       var basketMap = {};
@@ -439,7 +450,7 @@ var MenuBasket = (function () {
       var order = {
         table: MenuCore.getTable(),
         basket: mergedBasket,
-        servings: servingsBySection,
+        servings: servings,
         existingOrder: MenuCore.getExistingOrder(),
         total: MenuCore.getBasketTotal()
       };
