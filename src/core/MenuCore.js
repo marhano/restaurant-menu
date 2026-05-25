@@ -437,6 +437,8 @@ var MenuCore = (function () {
     if (!item) return null;
     var sectionId = resolveSection(item, overrideSectionId);
 
+    if (sectionId !== _activeSectionId) setActiveSection(sectionId);
+
     // Stack if an un-noted line for same item+section+serving exists
     var existing = _findLine(itemId, sectionId);
     if (existing) {

@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-14T05:23:16.742Z
+ * Built: 2026-05-25T01:50:44.562Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -59,6 +59,7 @@ var MenuConfig = (function () {
     showFilter: true,
     showImages: true,
     showDescriptions: true,
+    showTags: true,
     showEllipsis: true, // per-item "…" menu to choose basket section
     showImageUpdate: false, // per-item button to replace the card image
     showSendOrderButton: true,
@@ -205,7 +206,8 @@ var MenuConfig = (function () {
       price:         price != null ? price : 0,
       image:         _v(it.Image,         it.image)         || "",
       categoryId:    String(_v(it.CategoryId,    it.categoryId)    || ""),
-      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || "")
+      subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || ""),
+      tags:          Array.isArray(_v(it.Tags, it.tags)) ? _v(it.Tags, it.tags) : []
     };
   }
 
@@ -717,6 +719,8 @@ var MenuCore = (function () {
     var item = getItemById(itemId);
     if (!item) return null;
     var sectionId = resolveSection(item, overrideSectionId);
+
+    if (sectionId !== _activeSectionId) setActiveSection(sectionId);
 
     // Stack if an un-noted line for same item+section+serving exists
     var existing = _findLine(itemId, sectionId);
@@ -1332,6 +1336,9 @@ var MenuRender = (function () {
     if (cfg.showDescriptions && item.description) {
       $body.append(jQuery("<div>").addClass(ns("item-desc")).text(item.description));
     }
+    if (cfg.showTags && item.tags && item.tags.length) {
+      $body.append(buildMenuItemTags(item));
+    }
     $body.append(jQuery("<div>").addClass(ns("item-price")).text(priceText));
     $card.append($body);
 
@@ -1544,9 +1551,6 @@ var MenuBrowse = (function () {
           cfg.labels.all
         )
       );
-      $left.append(
-        MenuRender.buildMenuItemTags({ tags: ["Vegetarian", "Gluten-Free", 'Japan', '1999'] })
-      );
     } else {
       $left.append(
         MenuRender.buildCategoryTabs(MenuCore.getCategories(), MenuCore.getActiveCategoryId())
@@ -1557,11 +1561,6 @@ var MenuBrowse = (function () {
           MenuCore.getActiveSubcategoryId(),
           cfg.labels.all
         )
-      );
-      $left.append(
-        MenuRender.buildMenuItemTags({
-          tags: ["Vegetarian", "Gluten-Free", "Japan", "1999"],
-        }),
       );
     }
     $left.append(MenuRender.buildItemGrid());
