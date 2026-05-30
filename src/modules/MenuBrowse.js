@@ -6,6 +6,8 @@
 var MenuBrowse = (function () {
   var _$root = null;
   var _toastTimer = null;
+  var _observer = null;
+  var _RENDER_CHUNK = 15;
 
   function build($root) {
     _$root = $root;
@@ -127,16 +129,46 @@ var MenuBrowse = (function () {
   }
 
   function _renderItems() {
+    if (_observer) { _observer.disconnect(); _observer = null; }
     var cfg = MenuCore.getConfig();
     var $grid = _$root.find("." + MenuRender.ns("item-grid")).empty();
     var items = MenuCore.getFilteredItems();
+
     if (!items.length) {
       $grid.append(jQuery("<div>").addClass(MenuRender.ns("item-empty")).text("No items"));
       return;
     }
-    items.forEach(function (it) {
-      $grid.append(MenuRender.buildItemCard(it, cfg, MenuCore.formatPrice(it.price)));
-    });
+
+    var grid = $grid[0];
+    var idx = 0;
+
+    function renderBatch() {
+      var frag = document.createDocumentFragment();
+      var end = Math.min(idx + _RENDER_CHUNK, items.length);
+      for (var i = idx; i < end; i++) {
+        frag.appendChild(MenuRender.buildItemCard(items[i], cfg, MenuCore.formatPrice(items[i].price))[0]);
+      }
+      grid.appendChild(frag);
+      idx = end;
+
+      if (idx >= items.length) return;
+
+      var sentinel = document.createElement("div");
+      sentinel.style.height = "1px";
+      grid.appendChild(sentinel);
+
+      _observer = new IntersectionObserver(function (entries) {
+        if (!entries[0].isIntersecting) return;
+        _observer.disconnect();
+        _observer = null;
+        if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+        renderBatch();
+      }, { rootMargin: "200px" });
+
+      _observer.observe(sentinel);
+    }
+
+    renderBatch();
   }
 
   function _bind() {
