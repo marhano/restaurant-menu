@@ -13,6 +13,7 @@ var MenuCore = (function () {
   var _search = "";
   var _filters = { minPrice: null, maxPrice: null, sort: "default" };
   var _table = null;
+  var _lastRerouted = null; // set by resolveSection when inactive-section fallback fires
   // Per-section serving counters: { sectionId: currentServingNumber }
   var _sectionServings = {};
 
@@ -361,9 +362,12 @@ var MenuCore = (function () {
     // If the resolved section is inactive, fall back to the first active section
     var activeSecs = getBasketSections();
     var isActive = activeSecs.some(function (s) { return s.code === code; });
-    if (!isActive && activeSecs[0]) code = activeSecs[0].code;
+    _lastRerouted = (!isActive && activeSecs[0]) ? activeSecs[0] : null;
+    if (_lastRerouted) code = _lastRerouted.code;
     return code;
   }
+
+  function getLastRerouted() { return _lastRerouted; }
 
   // ── Basket ops ────────────────────────────────────
 
@@ -772,6 +776,7 @@ var MenuCore = (function () {
     getBasketSections: getBasketSections,
     getActiveSectionId: getActiveSectionId,
     setActiveSection: setActiveSection,
+    getLastRerouted: getLastRerouted,
     resolveSection: resolveSection,
 
     // Basket

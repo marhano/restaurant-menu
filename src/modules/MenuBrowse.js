@@ -156,7 +156,8 @@ var MenuBrowse = (function () {
       if (idx >= items.length) return;
 
       var sentinel = document.createElement("div");
-      sentinel.style.height = "1px";
+      sentinel.className = MenuRender.ns("lazy-loader");
+      sentinel.innerHTML = '<i class="fa-solid fa-spinner"></i><span>Loading more…</span>';
       grid.appendChild(sentinel);
 
       _observer = new IntersectionObserver(function (entries) {
@@ -191,7 +192,8 @@ var MenuBrowse = (function () {
       if (cfg.subcategoryNav) {
         MenuCore.setSubcategory(jQuery(this).attr("data-sub-id"));
       } else {
-        MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+        var newCatId = jQuery(this).attr("data-cat-id");
+        MenuCore.setCategory(newCatId);
       }
     });
 
@@ -209,7 +211,7 @@ var MenuBrowse = (function () {
       if (jQuery(e.target).closest("." + ns("item-ellipsis")).length) return;
       var id = jQuery(this).attr("data-item-id");
       var line = MenuCore.addItem(id);
-      if (line) _pulseCard(jQuery(this), line.item);
+      if (line) _pulseCard(jQuery(this), line.item, MenuCore.getLastRerouted());
     });
 
     // Image update button → trigger onImageUpdate callback
@@ -294,13 +296,17 @@ var MenuBrowse = (function () {
     jQuery(document).off("click.rmfilter");
   }
 
-  function _pulseCard($card, item) {
+  function _pulseCard($card, item, reroutedSection) {
     var cls = MenuRender.ns("item-card--pulse");
     $card.removeClass(cls);
     void $card[0].offsetWidth; // force reflow so re-adding the class restarts the animation
     $card.addClass(cls);
     setTimeout(function () { $card.removeClass(cls); }, 480);
-    _showAddToast(item);
+    if (reroutedSection) {
+      _showRerouteToast(item, reroutedSection);
+    } else {
+      _showAddToast(item);
+    }
   }
 
   function _showAddToast(item) {
@@ -310,6 +316,23 @@ var MenuBrowse = (function () {
     var $toast = jQuery("<div>").addClass(ns("add-toast"))
       .append(jQuery("<i>").addClass("fa-solid fa-check"))
       .append(jQuery("<span>").text(item && item.name ? item.name : "Item added"));
+    jQuery("body").append($toast);
+    setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
+    _toastTimer = setTimeout(function () {
+      $toast.removeClass(ns("add-toast--show"));
+      setTimeout(function () { $toast.remove(); }, 260);
+    }, 2000);
+  }
+
+  function _showRerouteToast(item, section) {
+    var ns = MenuRender.ns;
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    jQuery("." + ns("add-toast")).remove();
+    var itemName = item && item.name ? item.name : "Item";
+    var sectionLabel = section.label || section.code;
+    var $toast = jQuery("<div>").addClass(ns("add-toast"))
+      .append(jQuery("<i>").addClass("fa-solid fa-arrow-right-arrow-left"))
+      .append(jQuery("<span>").text(itemName + " → " + sectionLabel));
     jQuery("body").append($toast);
     setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
     _toastTimer = setTimeout(function () {

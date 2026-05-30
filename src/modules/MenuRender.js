@@ -218,7 +218,7 @@ var MenuRender = (function () {
     if (cfg.showImages) {
       var $imgBox = jQuery("<div>").addClass(ns("item-img"));
       if (item.image) {
-        $imgBox.append(jQuery("<img>").attr("src", item.image).attr("alt", item.name || ""));
+        $imgBox.append(jQuery("<img>").attr("src", item.image).attr("alt", item.name || "").attr("loading", "lazy"));
       } else {
         $imgBox.append(jQuery("<i>").addClass("fa-solid fa-utensils " + ns("item-img-placeholder")));
       }

@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-30T16:39:27.352Z
+ * Built: 2026-05-30T19:48:51.306Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -296,6 +296,7 @@ var MenuCore = (function () {
   var _search = "";
   var _filters = { minPrice: null, maxPrice: null, sort: "default" };
   var _table = null;
+  var _lastRerouted = null; // set by resolveSection when inactive-section fallback fires
   // Per-section serving counters: { sectionId: currentServingNumber }
   var _sectionServings = {};
 
@@ -644,9 +645,12 @@ var MenuCore = (function () {
     // If the resolved section is inactive, fall back to the first active section
     var activeSecs = getBasketSections();
     var isActive = activeSecs.some(function (s) { return s.code === code; });
-    if (!isActive && activeSecs[0]) code = activeSecs[0].code;
+    _lastRerouted = (!isActive && activeSecs[0]) ? activeSecs[0] : null;
+    if (_lastRerouted) code = _lastRerouted.code;
     return code;
   }
+
+  function getLastRerouted() { return _lastRerouted; }
 
   // ── Basket ops ────────────────────────────────────
 
@@ -1055,6 +1059,7 @@ var MenuCore = (function () {
     getBasketSections: getBasketSections,
     getActiveSectionId: getActiveSectionId,
     setActiveSection: setActiveSection,
+    getLastRerouted: getLastRerouted,
     resolveSection: resolveSection,
 
     // Basket
@@ -1315,7 +1320,7 @@ var MenuRender = (function () {
     if (cfg.showImages) {
       var $imgBox = jQuery("<div>").addClass(ns("item-img"));
       if (item.image) {
-        $imgBox.append(jQuery("<img>").attr("src", item.image).attr("alt", item.name || ""));
+        $imgBox.append(jQuery("<img>").attr("src", item.image).attr("alt", item.name || "").attr("loading", "lazy"));
       } else {
         $imgBox.append(jQuery("<i>").addClass("fa-solid fa-utensils " + ns("item-img-placeholder")));
       }
@@ -1690,7 +1695,8 @@ var MenuBrowse = (function () {
       if (idx >= items.length) return;
 
       var sentinel = document.createElement("div");
-      sentinel.style.height = "1px";
+      sentinel.className = MenuRender.ns("lazy-loader");
+      sentinel.innerHTML = '<i class="fa-solid fa-spinner"></i><span>Loading more…</span>';
       grid.appendChild(sentinel);
 
       _observer = new IntersectionObserver(function (entries) {
@@ -1725,7 +1731,8 @@ var MenuBrowse = (function () {
       if (cfg.subcategoryNav) {
         MenuCore.setSubcategory(jQuery(this).attr("data-sub-id"));
       } else {
-        MenuCore.setCategory(jQuery(this).attr("data-cat-id"));
+        var newCatId = jQuery(this).attr("data-cat-id");
+        MenuCore.setCategory(newCatId);
       }
     });
 
@@ -1743,7 +1750,7 @@ var MenuBrowse = (function () {
       if (jQuery(e.target).closest("." + ns("item-ellipsis")).length) return;
       var id = jQuery(this).attr("data-item-id");
       var line = MenuCore.addItem(id);
-      if (line) _pulseCard(jQuery(this), line.item);
+      if (line) _pulseCard(jQuery(this), line.item, MenuCore.getLastRerouted());
     });
 
     // Image update button → trigger onImageUpdate callback
@@ -1828,13 +1835,17 @@ var MenuBrowse = (function () {
     jQuery(document).off("click.rmfilter");
   }
 
-  function _pulseCard($card, item) {
+  function _pulseCard($card, item, reroutedSection) {
     var cls = MenuRender.ns("item-card--pulse");
     $card.removeClass(cls);
     void $card[0].offsetWidth; // force reflow so re-adding the class restarts the animation
     $card.addClass(cls);
     setTimeout(function () { $card.removeClass(cls); }, 480);
-    _showAddToast(item);
+    if (reroutedSection) {
+      _showRerouteToast(item, reroutedSection);
+    } else {
+      _showAddToast(item);
+    }
   }
 
   function _showAddToast(item) {
@@ -1844,6 +1855,23 @@ var MenuBrowse = (function () {
     var $toast = jQuery("<div>").addClass(ns("add-toast"))
       .append(jQuery("<i>").addClass("fa-solid fa-check"))
       .append(jQuery("<span>").text(item && item.name ? item.name : "Item added"));
+    jQuery("body").append($toast);
+    setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
+    _toastTimer = setTimeout(function () {
+      $toast.removeClass(ns("add-toast--show"));
+      setTimeout(function () { $toast.remove(); }, 260);
+    }, 2000);
+  }
+
+  function _showRerouteToast(item, section) {
+    var ns = MenuRender.ns;
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    jQuery("." + ns("add-toast")).remove();
+    var itemName = item && item.name ? item.name : "Item";
+    var sectionLabel = section.label || section.code;
+    var $toast = jQuery("<div>").addClass(ns("add-toast"))
+      .append(jQuery("<i>").addClass("fa-solid fa-arrow-right-arrow-left"))
+      .append(jQuery("<span>").text(itemName + " → " + sectionLabel));
     jQuery("body").append($toast);
     setTimeout(function () { $toast.addClass(ns("add-toast--show")); }, 10);
     _toastTimer = setTimeout(function () {
