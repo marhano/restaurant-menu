@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-30T15:51:45.444Z
+ * Built: 2026-05-30T16:39:27.352Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -289,6 +289,7 @@ var MenuEvents = (function () {
 var MenuCore = (function () {
   var _cfg = null;
   var _menuRoutes = [];
+  var _routeMap = {}; // categoryId → basketId, rebuilt whenever _menuRoutes changes
   var _activeCategoryId = null;
   var _activeSubcategoryId = null; // null = "all" within category
   var _activeSectionId = null;     // active basket section tab
@@ -330,11 +331,13 @@ var MenuCore = (function () {
     var _defIsActive = _activeSecs.some(function (s) { return s.code === cfg.defaultBasketSection; });
     _activeSectionId = _defIsActive ? cfg.defaultBasketSection : (_activeSecs[0] ? _activeSecs[0].code : cfg.defaultBasketSection);
     _menuRoutes = Array.isArray(cfg.menuRoutes) ? cfg.menuRoutes.map(MenuConfig.normalizeRoute) : [];
+    _buildRouteMap();
   }
 
   function reset() {
     _cfg = null;
     _menuRoutes = [];
+    _routeMap = {};
     _basket = [];
     _existingOrder = [];
     _lineSeq = 1;
@@ -583,17 +586,21 @@ var MenuCore = (function () {
 
   function setMenuRoutes(routes) {
     _menuRoutes = Array.isArray(routes) ? routes.map(MenuConfig.normalizeRoute) : [];
+    _buildRouteMap();
   }
 
   function getMenuRoutes() { return _menuRoutes.slice(); }
 
-  function _routeFor(key) {
+  function _buildRouteMap() {
+    _routeMap = {};
     for (var i = 0; i < _menuRoutes.length; i++) {
-      if (_menuRoutes[i].categoryId === key && _menuRoutes[i].basketId) {
-        return _menuRoutes[i].basketId;
-      }
+      var r = _menuRoutes[i];
+      if (r.categoryId && r.basketId) _routeMap[r.categoryId] = r.basketId;
     }
-    return null;
+  }
+
+  function _routeFor(key) {
+    return _routeMap[key] || null;
   }
 
   function _parentCategoryOf(subcategoryId) {
@@ -1535,6 +1542,7 @@ var MenuBrowse = (function () {
   var _toastTimer = null;
   var _observer = null;
   var _RENDER_CHUNK = 15;
+  var _searchTimer = null;
 
   function build($root) {
     _$root = $root;
@@ -1644,14 +1652,15 @@ var MenuBrowse = (function () {
         ));
       return;
     }
+    var activeCatId = MenuCore.getActiveCategoryId();
     _$root.find("." + MenuRender.ns("sub-tabs"))
       .replaceWith(MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+        MenuCore.getSubcategories(activeCatId),
         MenuCore.getActiveSubcategoryId(),
         cfg.labels.all
       ));
     _$root.find("." + MenuRender.ns("cat-tab")).removeClass(MenuRender.ns("cat-tab--active"));
-    _$root.find("." + MenuRender.ns("cat-tab") + "[data-cat-id='" + MenuCore.getActiveCategoryId() + "']")
+    _$root.find("." + MenuRender.ns("cat-tab") + "[data-cat-id='" + activeCatId + "']")
       .addClass(MenuRender.ns("cat-tab--active"));
   }
 
@@ -1702,7 +1711,9 @@ var MenuBrowse = (function () {
     var ns = MenuRender.ns;
 
     _$root.on("input", "." + ns("search-input"), function () {
-      MenuCore.setSearch(jQuery(this).val());
+      var val = jQuery(this).val();
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(function () { MenuCore.setSearch(val); }, 200);
     });
 
     _$root.on("click", "." + ns("search-clear"), function () {

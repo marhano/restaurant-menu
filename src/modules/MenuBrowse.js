@@ -8,6 +8,7 @@ var MenuBrowse = (function () {
   var _toastTimer = null;
   var _observer = null;
   var _RENDER_CHUNK = 15;
+  var _searchTimer = null;
 
   function build($root) {
     _$root = $root;
@@ -117,14 +118,15 @@ var MenuBrowse = (function () {
         ));
       return;
     }
+    var activeCatId = MenuCore.getActiveCategoryId();
     _$root.find("." + MenuRender.ns("sub-tabs"))
       .replaceWith(MenuRender.buildSubTabs(
-        MenuCore.getSubcategories(MenuCore.getActiveCategoryId()),
+        MenuCore.getSubcategories(activeCatId),
         MenuCore.getActiveSubcategoryId(),
         cfg.labels.all
       ));
     _$root.find("." + MenuRender.ns("cat-tab")).removeClass(MenuRender.ns("cat-tab--active"));
-    _$root.find("." + MenuRender.ns("cat-tab") + "[data-cat-id='" + MenuCore.getActiveCategoryId() + "']")
+    _$root.find("." + MenuRender.ns("cat-tab") + "[data-cat-id='" + activeCatId + "']")
       .addClass(MenuRender.ns("cat-tab--active"));
   }
 
@@ -175,7 +177,9 @@ var MenuBrowse = (function () {
     var ns = MenuRender.ns;
 
     _$root.on("input", "." + ns("search-input"), function () {
-      MenuCore.setSearch(jQuery(this).val());
+      var val = jQuery(this).val();
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(function () { MenuCore.setSearch(val); }, 200);
     });
 
     _$root.on("click", "." + ns("search-clear"), function () {
