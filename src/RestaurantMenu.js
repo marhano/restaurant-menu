@@ -51,7 +51,7 @@ var RestaurantMenu = (function () {
         jQuery("<button type='button'>").addClass("rm-menu-modal-close")
           .attr("aria-label", "Close")
           .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
-          .on("click", function () { closeMenuModal(); })
+          .on("click", function () { closeMenuModal(true); })
       );
       $root.append($modalTopbar);
       var $modalContent = jQuery("<div>").addClass("rm-modal-content");
@@ -146,20 +146,28 @@ var RestaurantMenu = (function () {
       jQuery("html").addClass("modal-shown");
       jQuery("body").css("overflow", "hidden");
       jQuery(document).on("keydown.rmmenumodal", function (e) {
-        if (e.key === "Escape") closeMenuModal();
+        if (e.key === "Escape") closeMenuModal(true);
       });
     }
-    function closeMenuModal() {
-      if (!cfg.modal || !_menuModalOpen) return;
+    function _doCloseMenuModal() {
       _menuModalOpen = false;
       $menuOverlay.removeClass("rm-menu-overlay--open");
       jQuery("html").removeClass("modal-shown");
       jQuery("body").css("overflow", "");
       jQuery(document).off("keydown.rmmenumodal");
     }
+
+    function closeMenuModal(userInitiated) {
+      if (!cfg.modal || !_menuModalOpen) return;
+      if (userInitiated && typeof cfg.onBeforeClose === "function") {
+        cfg.onBeforeClose(function () { _doCloseMenuModal(); }, MenuCore.getTable(), MenuCore.getBasket());
+        return;
+      }
+      _doCloseMenuModal();
+    }
     if (cfg.modal) {
       $menuOverlay.on("click", function (e) {
-        if (e.target === $menuOverlay[0]) closeMenuModal();
+        if (e.target === $menuOverlay[0]) closeMenuModal(true);
       });
     }
 

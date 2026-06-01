@@ -1056,6 +1056,9 @@
   border-color: var(--rm-border);
 }
 .rm-btn-cancel:hover { background: var(--rm-surface-dim); color: var(--rm-surface-alt); }
+.rm-btn-danger { background: var(--rm-danger); color: #fff; border-color: var(--rm-danger); }
+.rm-btn-danger:hover { background: #dc2626; border-color: #dc2626; }
+
 
 /* ── Menu modal ───────────────────────────────────── */
 .rm-menu-overlay {

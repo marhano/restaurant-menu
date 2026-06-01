@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-05-30T19:48:51.306Z
+ * Built: 2026-06-01T08:10:00.428Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -113,6 +113,10 @@ var MenuConfig = (function () {
       clear: "Clear",
       apply: "Apply",
       noTable: "No table selected",
+      confirmLeaveTitle:   "Leave menu?",
+      confirmLeaveMessage: "Your basket will be cleared.",
+      confirmLeave:        "Leave",
+      confirmStay:         "Stay",
     },
 
     // Theme tokens (overridden via CSS vars)
@@ -142,6 +146,7 @@ var MenuConfig = (function () {
     onSendOrder: null, // (order, done) order={ table, basket, servings:[{ basketId, servings:[{ serving, items:[{ id, name, qty, note }] }] }], existingOrder, total }
     onTableChange: null, // (table)
     onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
+    onBeforeClose: null, // (proceed, table, basket) — called on user-initiated close; call proceed() to confirm and close
   };
 
   // Accept either PascalCase (C# serialized) or camelCase for the same property.
@@ -2966,7 +2971,7 @@ var RestaurantMenu = (function () {
         jQuery("<button type='button'>").addClass("rm-menu-modal-close")
           .attr("aria-label", "Close")
           .append(jQuery("<i>").addClass("fa-solid fa-xmark"))
-          .on("click", function () { closeMenuModal(); })
+          .on("click", function () { closeMenuModal(true); })
       );
       $root.append($modalTopbar);
       var $modalContent = jQuery("<div>").addClass("rm-modal-content");
@@ -3061,20 +3066,28 @@ var RestaurantMenu = (function () {
       jQuery("html").addClass("modal-shown");
       jQuery("body").css("overflow", "hidden");
       jQuery(document).on("keydown.rmmenumodal", function (e) {
-        if (e.key === "Escape") closeMenuModal();
+        if (e.key === "Escape") closeMenuModal(true);
       });
     }
-    function closeMenuModal() {
-      if (!cfg.modal || !_menuModalOpen) return;
+    function _doCloseMenuModal() {
       _menuModalOpen = false;
       $menuOverlay.removeClass("rm-menu-overlay--open");
       jQuery("html").removeClass("modal-shown");
       jQuery("body").css("overflow", "");
       jQuery(document).off("keydown.rmmenumodal");
     }
+
+    function closeMenuModal(userInitiated) {
+      if (!cfg.modal || !_menuModalOpen) return;
+      if (userInitiated && typeof cfg.onBeforeClose === "function") {
+        cfg.onBeforeClose(function () { _doCloseMenuModal(); }, MenuCore.getTable(), MenuCore.getBasket());
+        return;
+      }
+      _doCloseMenuModal();
+    }
     if (cfg.modal) {
       $menuOverlay.on("click", function (e) {
-        if (e.target === $menuOverlay[0]) closeMenuModal();
+        if (e.target === $menuOverlay[0]) closeMenuModal(true);
       });
     }
 

@@ -104,6 +104,10 @@ var MenuConfig = (function () {
       clear: "Clear",
       apply: "Apply",
       noTable: "No table selected",
+      confirmLeaveTitle:   "Leave menu?",
+      confirmLeaveMessage: "Your basket will be cleared.",
+      confirmLeave:        "Leave",
+      confirmStay:         "Stay",
     },
 
     // Theme tokens (overridden via CSS vars)
@@ -133,6 +137,7 @@ var MenuConfig = (function () {
     onSendOrder: null, // (order, done) order={ table, basket, servings:[{ basketId, servings:[{ serving, items:[{ id, name, qty, note }] }] }], existingOrder, total }
     onTableChange: null, // (table)
     onImageUpdate: null, // (itemId, setImage) — user calls setImage(src) to apply the new image
+    onBeforeClose: null, // (proceed, table, basket) — called on user-initiated close; call proceed() to confirm and close
   };
 
   // Accept either PascalCase (C# serialized) or camelCase for the same property.
