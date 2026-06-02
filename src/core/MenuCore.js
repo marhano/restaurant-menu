@@ -663,7 +663,12 @@ var MenuCore = (function () {
       MenuEvents.emit("existingOrder:changed");
       return;
     }
-    lines.forEach(function (entry) {
+    lines.forEach(function (raw) {
+      var entry = {
+        ProductId: raw.ProductId !== undefined ? raw.ProductId : raw.productId,
+        Quantity:  raw.Quantity  !== undefined ? raw.Quantity  : raw.quantity,
+        Note:      raw.Note      !== undefined ? raw.Note      : (raw.note || "")
+      };
       var item = getItemById(entry.ProductId);
       if (!item) {
         console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);

@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-06-01T08:10:00.428Z
+ * Built: 2026-06-02T06:44:15.637Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -951,7 +951,12 @@ var MenuCore = (function () {
       MenuEvents.emit("existingOrder:changed");
       return;
     }
-    lines.forEach(function (entry) {
+    lines.forEach(function (raw) {
+      var entry = {
+        ProductId: raw.ProductId !== undefined ? raw.ProductId : raw.productId,
+        Quantity:  raw.Quantity  !== undefined ? raw.Quantity  : raw.quantity,
+        Note:      raw.Note      !== undefined ? raw.Note      : (raw.note || "")
+      };
       var item = getItemById(entry.ProductId);
       if (!item) {
         console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
