@@ -372,7 +372,7 @@ var MenuRender = (function () {
 
   // ── Note display ──────────────────────────────────
   function buildNoteDisplay(note) {
-    var lines = (note || "").split("*").filter(function (l) { return l.trim() !== ""; });
+    var lines = (note || "").split(", ").filter(function (l) { return l.trim() !== ""; });
     var $wrap = jQuery("<div>").addClass(ns("basket-line-note"));
 
     if (lines.length <= 1) {

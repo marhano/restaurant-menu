@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-06-08T04:20:48.632Z
+ * Built: 2026-06-08T05:54:11.630Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -1484,7 +1484,7 @@ var MenuRender = (function () {
 
   // ── Note display ──────────────────────────────────
   function buildNoteDisplay(note) {
-    var lines = (note || "").split("*").filter(function (l) { return l.trim() !== ""; });
+    var lines = (note || "").split(", ").filter(function (l) { return l.trim() !== ""; });
     var $wrap = jQuery("<div>").addClass(ns("basket-line-note"));
 
     if (lines.length <= 1) {
@@ -1979,7 +1979,7 @@ var MenuEditLine = (function () {
     );
 
     // ── Note field — dynamic input lines ──────────────
-    var existingLines = (line.note || "").split("*").filter(function (l) { return l.trim() !== ""; });
+    var existingLines = (line.note || "").split(", ").filter(function (l) { return l.trim() !== ""; });
     if (!existingLines.length) existingLines = [""];
 
     var $noteInputs = jQuery("<div>").addClass(ns("note-inputs"));
@@ -1991,8 +1991,11 @@ var MenuEditLine = (function () {
       .append(jQuery("<span>").text("Add line"));
 
     function getTotalChars() {
-      return $noteInputs.find("input").map(function () { return jQuery(this).val().length; }).get()
+      var $rows = $noteInputs.find("." + ns("note-input-row"));
+      var inputChars = $rows.find("input").map(function () { return jQuery(this).val().length; }).get()
         .reduce(function (a, b) { return a + b; }, 0);
+      var separators = Math.max(0, $rows.length - 1) * 2;
+      return inputChars + separators;
     }
 
     function syncControls() {
@@ -2098,7 +2101,7 @@ var MenuEditLine = (function () {
         .map(function () { return jQuery.trim(jQuery(this).val()); })
         .get()
         .filter(function (v) { return v !== ""; })
-        .join("*");
+        .join(", ");
       var newSection = $sel.val();
       if (newNote !== (line.note || "")) MenuCore.setLineNote(line.lineId, newNote);
       if (newSection !== line.sectionId) MenuCore.moveLineToSection(line.lineId, newSection);
