@@ -465,7 +465,13 @@ var MenuBasket = (function () {
   function _initDragDrop() {
     var ns = MenuRender.ns;
     var LINE_SEL = "." + ns("basket-line") + ", ." + ns("serving-line");
+    var HANDLE_SEL_CTX = "." + ns("serving-acc-handle");
     var dragState = null;
+
+    // Block browser context menu (long-press on mobile) on draggable elements
+    _$root.on("contextmenu", LINE_SEL + ", " + HANDLE_SEL_CTX, function (e) {
+      e.preventDefault();
+    });
 
     // ── Shared helpers ────────────────────────────────
 
