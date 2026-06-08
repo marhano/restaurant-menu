@@ -4,7 +4,7 @@
  */
 var MenuEditLine = (function () {
 
-  var MAX_LINE_LEN = 50;
+  var MAX_TOTAL = 30;
 
   function open(line) {
     var cfg = MenuCore.getConfig();
@@ -21,30 +21,47 @@ var MenuEditLine = (function () {
     );
 
     // ── Note field — dynamic input lines ──────────────
-    var existingLines = (line.note || "").split("\n").filter(function (l) { return l.trim() !== ""; });
+    var existingLines = (line.note || "").split("*").filter(function (l) { return l.trim() !== ""; });
     if (!existingLines.length) existingLines = [""];
 
     var $noteInputs = jQuery("<div>").addClass(ns("note-inputs"));
+    var $charCount = jQuery("<span>").addClass(ns("note-char-count"));
 
     var $addLine = jQuery("<button type='button'>")
       .addClass(ns("note-add-line"))
       .append(jQuery("<i>").addClass("fa-solid fa-plus"))
       .append(jQuery("<span>").text("Add line"));
 
+    function getTotalChars() {
+      return $noteInputs.find("input").map(function () { return jQuery(this).val().length; }).get()
+        .reduce(function (a, b) { return a + b; }, 0);
+    }
+
     function syncControls() {
       var $rows = $noteInputs.find("." + ns("note-input-row"));
       var multi = $rows.length > 1;
       $rows.find("." + ns("note-remove-line")).toggle(multi);
+
+      var total = getTotalChars();
+      var remaining = MAX_TOTAL - total;
+
+      $rows.each(function () {
+        var $inp = jQuery(this).find("input");
+        $inp.attr("maxlength", $inp.val().length + remaining);
+      });
+
+      $charCount.text(total + "/" + MAX_TOTAL);
+
       var lastVal = $rows.last().find("input").val().trim();
-      $addLine.prop("disabled", !lastVal);
+      $addLine.prop("disabled", !lastVal || remaining <= 0);
     }
 
     function addInputRow(val) {
       var $row = jQuery("<div>").addClass(ns("note-input-row"));
       var $input = jQuery("<input type='text'>")
         .addClass(ns("field-input"))
-        .attr("maxlength", MAX_LINE_LEN)
         .attr("placeholder", cfg.labels.addNote || "Add note…")
+        .attr("enterkeyhint", "next")
         .val(val || "");
       var $remove = jQuery("<button type='button'>")
         .addClass(ns("note-remove-line"))
@@ -55,6 +72,15 @@ var MenuEditLine = (function () {
       $noteInputs.append($row);
 
       $input.on("input", syncControls);
+      $input.on("keydown", function (e) {
+        if (e.key !== "Enter" && e.keyCode !== 13) return;
+        e.preventDefault();
+        var val = $input.val().trim();
+        if (!val || getTotalChars() >= MAX_TOTAL) return;
+        addInputRow("");
+        $noteInputs.find("input").last().trigger("focus");
+        syncControls();
+      });
       $remove.on("click", function () {
         $row.remove();
         syncControls();
@@ -67,6 +93,7 @@ var MenuEditLine = (function () {
     $addLine.on("click", function () {
       var $last = $noteInputs.find("." + ns("note-input-row")).last();
       if (!$last.find("input").val().trim()) return;
+      if (getTotalChars() >= MAX_TOTAL) return;
       addInputRow("");
       $noteInputs.find("input").last().trigger("focus");
       syncControls();
@@ -76,7 +103,7 @@ var MenuEditLine = (function () {
       jQuery("<div>").addClass(ns("field")).append(
         jQuery("<label>").text(cfg.labels.note),
         $noteInputs,
-        $addLine
+        jQuery("<div>").addClass(ns("note-footer")).append($addLine, $charCount)
       )
     );
 
@@ -113,7 +140,7 @@ var MenuEditLine = (function () {
         .map(function () { return jQuery.trim(jQuery(this).val()); })
         .get()
         .filter(function (v) { return v !== ""; })
-        .join("\n");
+        .join("*");
       var newSection = $sel.val();
       if (newNote !== (line.note || "")) MenuCore.setLineNote(line.lineId, newNote);
       if (newSection !== line.sectionId) MenuCore.moveLineToSection(line.lineId, newSection);

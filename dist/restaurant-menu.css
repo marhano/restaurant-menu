@@ -1196,6 +1196,12 @@
 }
 
 /* ── Note multi-input ─────────────────────────────── */
+.rm-note-footer{
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rm-note-char-count{
+  color: var(--rm-surface-muted);
+}
 .rm-note-inputs { display: flex; flex-direction: column; gap: 6px; }
 .rm-note-input-row {
   display: flex; align-items: center; gap: 6px;
