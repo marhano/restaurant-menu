@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-06-08T03:44:04.996Z
+ * Built: 2026-06-08T04:02:01.003Z
  * Requires: jQuery 3+
  * License: MIT
  */

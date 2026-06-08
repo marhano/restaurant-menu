@@ -1221,9 +1221,53 @@
 
   .rm-modal-content {
     border-radius: 0;
-    padding-left: max(1rem, env(safe-area-inset-left, 1rem));
-    padding-right: max(1rem, env(safe-area-inset-right, 1rem));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0.75rem));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0.75rem));
+    padding-bottom: 1rem;
   }
+
+  /* ── Compact table info ── */
+  .rm-table-info { padding: 10px 14px; }
+  .rm-table-value { font-size: 0.88rem; }
+  .rm-table-cell { padding: 0 12px; }
+  .rm-table-pill { font-size: 0.76rem; padding: 2px 8px; }
+
+  /* ── Compact search + filter ── */
+  .rm-search-input { padding: 8px 10px 8px 34px; font-size: 0.88rem; }
+  .rm-filter-btn { padding: 0 12px; font-size: 0.82rem; }
+
+  /* ── Compact category tabs ── */
+  .rm-cat-tabs { gap: 4px; padding: 1px; }
+  .rm-cat-tab { padding: 6px 11px; font-size: 0.8rem; }
+  .rm-cat-tab-icon { font-size: 0.8rem; }
+  .rm-sub-tab { padding: 3px 9px; font-size: 0.76rem; }
+
+  /* ── Item tags ── */
+  .rm-item-tags { gap: 4px; }
+  .rm-item-tag { padding: 3px 8px; font-size: 0.68rem; }
+
+  /* ── Tight left column ── */
+  .rm-left { gap: 8px; }
+
+  /* ── 2-column item grid ── */
+  .rm-item-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 1px;
+  }
+
+  /* ── Compact item card ── */
+  .rm-item-card { border-radius: 10px; }
+  .rm-item-img { aspect-ratio: 1 / 1; }
+  .rm-item-body { padding: 8px 10px; gap: 2px; }
+  .rm-item-name { font-size: 0.82rem; }
+  .rm-item-desc {
+    font-size: 0.72rem;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+  .rm-item-price { font-size: 0.82rem; margin-top: 4px; }
+  .rm-item-ellipsis { width: 26px; height: 26px; top: 5px; right: 5px; font-size: 0.72rem; }
 }
 
 /* ── Modal (item edit) ────────────────────────────── */
