@@ -1,7 +1,7 @@
 /*!
  * restaurant-menu.js v0.0.1
  * Restaurant Menu & Basket Library
- * Built: 2026-06-08T05:54:11.630Z
+ * Built: 2026-06-09T09:31:20.707Z
  * Requires: jQuery 3+
  * License: MIT
  */
@@ -959,8 +959,19 @@ var MenuCore = (function () {
       };
       var item = getItemById(entry.ProductId);
       if (!item) {
-        console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
-        return;
+        var rawName = raw.ProductName || raw.productName || raw.name || null;
+        if (!rawName) {
+          console.warn("[RestaurantMenu] loadBasket: no item found for ProductId=", entry.ProductId);
+          return;
+        }
+        item = MenuConfig.normalizeItem({
+          id:            entry.ProductId,
+          name:          rawName,
+          description:   raw.ProductDescription || raw.productDescription || "",
+          price:         raw.UnitAmount         || raw.unitAmount         || 0,
+          categoryId:    raw.ProductCategory    || raw.productCategory    || "",
+          subcategoryId: raw.ProductSubCategory || raw.productSubCategory || ""
+        });
       }
       var qty = Math.max(1, parseInt(entry.Quantity, 10) || 1);
       var existing = _existingOrder.find(function (l) { return l.item.id === item.id; });
