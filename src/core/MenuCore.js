@@ -185,7 +185,8 @@ var MenuCore = (function () {
 
     var out = items.filter(function (it) {
       // Status filter: always applied regardless of search state.
-      // Items belonging to an inactive category or inactive subcategory are hidden.
+      // Inactive items, or items belonging to an inactive category or inactive subcategory, are hidden.
+      if (it.status === "inactive") return false;
       if (it.categoryId) {
         var _allCats = _cfg ? _cfg.categories || [] : [];
         for (var _ci = 0; _ci < _allCats.length; _ci++) {

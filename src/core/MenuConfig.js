@@ -14,7 +14,8 @@ var MenuConfig = (function () {
     // status: "active" (default) | "inactive" — inactive categories hide all their subcategories.
     // A subcategory status of "inactive" hides it regardless of parent; parent "inactive" overrides child.
     categories: [],
-    // items: [{ id, name, description, price, image, categoryId, subcategoryId, basketSection? }]
+    // items: [{ id, name, description, price, image, categoryId, subcategoryId, basketSection?, status? }]
+    // An item status of "inactive" hides it regardless of its category/subcategory status.
     items: [],
 
     // Basket sections — ordered tabs displayed in the basket panel
@@ -203,7 +204,8 @@ var MenuConfig = (function () {
       image:         _v(it.Image,         it.image)         || "",
       categoryId:    String(_v(it.CategoryId,    it.categoryId)    || ""),
       subcategoryId: String(_v(it.SubCategoryId, it.subcategoryId) || ""),
-      tags:          Array.isArray(_v(it.Tags, it.tags)) ? _v(it.Tags, it.tags) : []
+      tags:          Array.isArray(_v(it.Tags, it.tags)) ? _v(it.Tags, it.tags) : [],
+      status:        (_v(it.Status, it.status) || "active").toLowerCase()
     };
   }
 
